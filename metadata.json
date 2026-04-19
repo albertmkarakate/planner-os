@@ -1,0 +1,6 @@
+{
+  "name": "Proactive AI Student Planner",
+  "description": "An AI-powered academic assistant that proactively organizes your schedule, ingest syllabi via RAG, and correlates wellness data with study productivity.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
