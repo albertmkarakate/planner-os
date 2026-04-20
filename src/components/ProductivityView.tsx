@@ -14,7 +14,7 @@ import {
   Zap,
   Star
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, Reorder } from 'motion/react';
 import { 
   Radar, 
   RadarChart, 
@@ -174,6 +174,13 @@ function KanbanBoard() {
     setShowTaskModal(false);
   };
 
+  const handleReorder = (colId: TaskStatus, reorderedColTasks: Task[]) => {
+    setTasks(prev => {
+      const otherTasks = prev.filter(t => t.status !== colId);
+      return [...otherTasks, ...reorderedColTasks];
+    });
+  };
+
   const columns: { id: TaskStatus; label: string; color: string }[] = [
     { id: "todo", label: "To Do", color: "#white/20" },
     { id: "progress", label: "In Progress", color: "#9d81ff" },
@@ -211,75 +218,82 @@ function KanbanBoard() {
           </div>
 
           <div className="space-y-3 min-h-[400px] p-2 bg-white/[0.02] rounded-3xl border border-dashed border-white/5">
-            {tasks
-              .filter((t) => t.status === col.id)
-              .map((task) => (
-                <motion.div
-                  layoutId={task.id}
-                  key={task.id}
-                  className="p-5 glass-card space-y-4 group cursor-grab active:cursor-grabbing hover:border-white/20 transition-all shadow-sm"
-                >
-                  <div className="flex items-start justify-between">
-                    <span
-                      className={`text-[9px] font-black uppercase tracking-tighter px-2 py-0.5 rounded border ${
-                        task.priority === "High"
-                          ? "bg-red-500/10 text-red-400 border-red-500/20"
-                          : task.priority === "Medium"
-                            ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                            : "bg-white/10 text-white/40 border-white/20"
-                      }`}
-                    >
-                      {task.priority}
-                    </span>
-                    <button 
-                      onClick={() => openTaskModal(task)}
-                      className="text-white/20 hover:text-white group-hover:block hidden"
-                    >
-                      <MoreHorizontal size={14} />
-                    </button>
-                  </div>
-
-                  <p className="text-sm font-bold text-white leading-tight">
-                    {task.title}
-                  </p>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-[10px] font-medium text-white/30">
-                      <Star size={10} className="text-[#9d81ff]" />
-                      {task.tag}
+            <Reorder.Group 
+              axis="y" 
+              values={tasks.filter((t) => t.status === col.id)} 
+              onReorder={(newOrder) => handleReorder(col.id, newOrder)}
+              className="space-y-3"
+            >
+              {tasks
+                .filter((t) => t.status === col.id)
+                .map((task) => (
+                  <Reorder.Item
+                    value={task}
+                    key={task.id}
+                    className="p-5 glass-card space-y-4 group cursor-grab active:cursor-grabbing hover:border-white/20 transition-all shadow-sm"
+                  >
+                    <div className="flex items-start justify-between">
+                      <span
+                        className={`text-[9px] font-black uppercase tracking-tighter px-2 py-0.5 rounded border ${
+                          task.priority === "High"
+                            ? "bg-red-500/10 text-red-400 border-red-500/20"
+                            : task.priority === "Medium"
+                              ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                              : "bg-white/10 text-white/40 border-white/20"
+                        }`}
+                      >
+                        {task.priority}
+                      </span>
+                      <button 
+                        onClick={() => openTaskModal(task)}
+                        className="text-white/20 hover:text-white group-hover:block hidden"
+                      >
+                        <MoreHorizontal size={14} />
+                      </button>
                     </div>
 
-                    <div className="flex gap-1">
-                      {col.id !== "todo" && (
-                        <button
-                          onClick={() =>
-                            moveTask(
-                              task.id,
-                              col.id === "done" ? "progress" : "todo",
-                            )
-                          }
-                          className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-white/30 hover:text-white transition-all"
-                        >
-                          <RotateCcw size={12} />
-                        </button>
-                      )}
-                      {col.id !== "done" && (
-                        <button
-                          onClick={() =>
-                            moveTask(
-                              task.id,
-                              col.id === "todo" ? "progress" : "done",
-                            )
-                          }
-                          className="p-1.5 bg-[#9d81ff]/20 hover:bg-[#9d81ff] rounded-lg text-[#9d81ff] hover:text-white transition-all"
-                        >
-                          <CheckCircle2 size={12} />
-                        </button>
-                      )}
+                    <p className="text-sm font-bold text-white leading-tight">
+                      {task.title}
+                    </p>
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-[10px] font-medium text-white/30">
+                        <Star size={10} className="text-[#9d81ff]" />
+                        {task.tag}
+                      </div>
+
+                      <div className="flex gap-1">
+                        {col.id !== "todo" && (
+                          <button
+                            onClick={() =>
+                              moveTask(
+                                task.id,
+                                col.id === "done" ? "progress" : "todo",
+                              )
+                            }
+                            className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-white/30 hover:text-white transition-all"
+                          >
+                            <RotateCcw size={12} />
+                          </button>
+                        )}
+                        {col.id !== "done" && (
+                          <button
+                            onClick={() =>
+                              moveTask(
+                                task.id,
+                                col.id === "todo" ? "progress" : "done",
+                              )
+                            }
+                            className="p-1.5 bg-[#9d81ff]/20 hover:bg-[#9d81ff] rounded-lg text-[#9d81ff] hover:text-white transition-all"
+                          >
+                            <CheckCircle2 size={12} />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </motion.div>
-              ))}
+                  </Reorder.Item>
+                ))}
+            </Reorder.Group>
           </div>
         </div>
       ))}

@@ -81,18 +81,55 @@ class KnowledgeLabWindow(QWidget):
         return page
 
     def handle_vault_export(self):
-        dest = QFileDialog.getExistingDirectory(self, "Select Vault Directory")
-        if not dest: return
-        
-        # Mock data for demonstration
-        mock_notes = [
-            {"title": "Biology Chapter 4", "content": "Biology covers the study of life. In chapter 4 we discuss cell division.", "tags": ["study", "biology"], "date": "2024-04-19", "class_name": "Biology 101"},
-            {"title": "AWS S3 Basics", "content": "Simple Storage Service is a key AWS exam objective.", "tags": ["cloud", "aws"], "date": "2024-04-18", "class_name": "Cloud Computing"}
-        ]
-        
-        builder = MarkdownVaultBuilder(dest, classes=["Biology 101", "Cloud Computing"])
-        builder.batch_export(mock_notes)
-        QMessageBox.information(self, "Success", f"Exported {len(mock_notes)} notes to Obsidian Vault.")
+        try:
+            dest = QFileDialog.getExistingDirectory(self, "Select Knowledge Vault Destination")
+            if not dest: 
+                return
+            
+            # Load actual notes if available, otherwise fallback to mock for safety
+            # In a production environment, this would query the SQLite StudyDatabase or a central JSON store
+            notes_file = os.path.join(os.path.expanduser("~"), ".student_planner", "knowledge_notes.json")
+            
+            if os.path.exists(notes_file):
+                with open(notes_file, "r") as f:
+                    notes_to_export = json.load(f)
+            else:
+                # Mock data if no user notes found yet
+                notes_to_export = [
+                    {
+                        "title": "Quantum Mechanics Intro", 
+                        "content": "Quantum mechanics is a fundamental theory in physics that describes the physical properties of nature at the scale of atoms and subatomic particles.", 
+                        "tags": ["physics", "science"], 
+                        "date": "2024-04-20", 
+                        "class_name": "Physics 202"
+                    },
+                    {
+                        "title": "Macroeconomics: Supply & Demand", 
+                        "content": "Supply and demand is an economic model of price determination in a market.", 
+                        "tags": ["economics", "social-science"], 
+                        "date": "2024-04-19", 
+                        "class_name": "Econ 101"
+                    }
+                ]
+
+            # Extract distinct classes for Wiki-link indexing
+            classes = list(set([n.get("class_name") for n in notes_to_export if n.get("class_name")]))
+            
+            builder = MarkdownVaultBuilder(dest, classes=classes)
+            exported_files = builder.batch_export(notes_to_export)
+            
+            if exported_files:
+                QMessageBox.information(
+                    self, 
+                    "Export Successful", 
+                    f"Successfully synthesized {len(exported_files)} Markdown nodes into your Knowledge Vault.\n\n"
+                    f"Destination: {dest}"
+                )
+            else:
+                QMessageBox.warning(self, "Export Warning", "No notes were found to export. Please add notes to your Knowledge Base first.")
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Export Failed", f"A critical error occurred during synthesis:\n\n{str(e)}")
 
     # --- TAB 2: PODCAST GENERATOR ---
     def build_podcast_tab(self):

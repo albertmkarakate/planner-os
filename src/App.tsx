@@ -19,7 +19,7 @@ import {
   LayoutGrid,
   Sun,
   Moon,
-  Search,
+  Search as SearchIcon,
   Bell,
   FlaskConical,
   Network
@@ -37,6 +37,7 @@ import KnowledgeLab from './components/KnowledgeLab';
 import KnowledgeGraphView from './components/KnowledgeGraphView';
 import SettingsView from './components/SettingsView';
 import OnboardingWizard from './components/OnboardingWizard';
+import SearchOverlay from './components/SearchOverlay';
 
 interface NavItem {
   id: Section;
@@ -59,6 +60,7 @@ export default function App() {
   const [learningMode, setLearningMode] = useState<LearningMode>(() => (localStorage.getItem('planner_learning_mode') as LearningMode) || 'Traditional');
   const [showWizard, setShowWizard] = useState(() => !localStorage.getItem('planner_setup_complete'));
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     const handleThemeChange = () => {
@@ -189,6 +191,16 @@ export default function App() {
     setShowWizard(false);
   };
 
+  const handleSearchSelect = (type: string, id: string) => {
+    setSearchQuery('');
+    switch (type) {
+      case 'note': setActiveSection('notes'); break;
+      case 'class': setActiveSection('classes'); break;
+      case 'event': setActiveSection('calendar'); break;
+      case 'task': setActiveSection('productivity'); break;
+    }
+  };
+
   const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
 
   return (
@@ -306,11 +318,18 @@ export default function App() {
           <div className="flex items-center gap-6">
              {/* Dynamic Search Bar - 250px per spec */}
              <div className="relative hidden lg:block">
-               <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)] opacity-50" />
+               <SearchIcon size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)] opacity-50" />
                <input 
                  type="text" 
+                 value={searchQuery}
+                 onChange={(e) => setSearchQuery(e.target.value)}
                  placeholder={`Search notes, tasks, or ${learningMode === 'Traditional' ? 'courses' : learningMode === 'Self-Study' ? 'paths' : 'workspaces'}...`}
                  className="w-[250px] bg-black/5 dark:bg-white/5 border-none outline-none rounded-full pl-10 pr-4 py-2.5 text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]/30 focus:ring-1 focus:ring-[var(--color-accent)] transition-all"
+               />
+               <SearchOverlay 
+                 query={searchQuery} 
+                 onClose={() => setSearchQuery('')} 
+                 onSelect={handleSearchSelect}
                />
              </div>
 
