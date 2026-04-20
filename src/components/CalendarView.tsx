@@ -26,7 +26,7 @@ interface CalendarEvent {
   id: string;
   day: number;
   title: string;
-  type: 'academic' | 'wellness' | 'social';
+  type: 'academic' | 'wellness' | 'social' | 'spiritual';
   time?: string;
   description?: string;
 }
@@ -204,7 +204,7 @@ export default function CalendarView() {
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-white/30">Classification</label>
                     <div className="flex gap-2">
-                      {['academic', 'wellness', 'social'].map(t => (
+                      {['academic', 'wellness', 'social', 'spiritual'].map(t => (
                         <button 
                           key={t}
                           onClick={() => setEditingEvent(prev => ({ ...prev!, type: t as any }))}
@@ -243,7 +243,7 @@ export default function CalendarView() {
                     onClick={handleSaveEvent}
                     className="flex-[2] py-4 bg-[#9d81ff] text-white rounded-[6px] text-[10px] font-black uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-[#9d81ff]/20"
                   >
-                    Confirm Synchronization
+                    Save Changes
                   </button>
                 </div>
               </div>
@@ -263,7 +263,7 @@ export default function CalendarView() {
         >
           {mode === 'year' && <YearlyView events={events} />}
           {mode === 'month' && <MonthlyView events={events} selectedDay={selectedDay} setSelectedDay={setSelectedDay} onExport={handleExportToOS} onEdit={handleEditEvent} onAdd={handleAddEvent} weekdays={weekdays} />}
-          {mode === 'week' && <WeeklyView events={events} weekdays={weekdays} />}
+          {mode === 'week' && <WeeklyView events={events} weekdays={weekdays} onEdit={handleEditEvent} onAdd={handleAddEvent} />}
         </motion.div>
       </AnimatePresence>
     </div>
@@ -383,6 +383,7 @@ function MonthlyView({ events, selectedDay, setSelectedDay, onExport, onEdit, on
                    <div className="flex gap-0.5">
                      {isCurrentMonth && dayEvents.some((e: any) => e.type === 'wellness') && <div className="w-1.5 h-1.5 rounded-full bg-[#4ade80]" />}
                      {isCurrentMonth && dayEvents.some((e: any) => e.type === 'academic') && <div className="w-1.5 h-1.5 rounded-full bg-[#3b82f6]" />}
+                     {isCurrentMonth && dayEvents.some((e: any) => e.type === 'spiritual') && <div className="w-1.5 h-1.5 rounded-full bg-[#f59e0b]" />}
                    </div>
                 </div>
 
@@ -390,9 +391,14 @@ function MonthlyView({ events, selectedDay, setSelectedDay, onExport, onEdit, on
                   {isCurrentMonth && dayEvents.slice(0, 2).map((e: any) => (
                     <div 
                       key={e.id} 
-                      className={`px-2 py-1 text-[9px] font-black uppercase tracking-tighter rounded-[4px] border flex items-center gap-1.5
+                      onClick={(ev) => {
+                        ev.stopPropagation();
+                        onEdit(e);
+                      }}
+                      className={`px-2 py-1 text-[9px] font-black uppercase tracking-tighter rounded-[4px] border flex items-center gap-1.5 cursor-pointer hover:scale-[1.02] transition-transform
                         ${e.type === 'academic' ? 'bg-[#9d81ff]/10 text-[#9d81ff] border-[#9d81ff]/20' : 
                           e.type === 'wellness' ? 'bg-[#4ade80]/10 text-[#4ade80] border-[#4ade80]/20' : 
+                          e.type === 'spiritual' ? 'bg-[#f59e0b]/10 text-[#f59e0b] border-[#f59e0b]/20' :
                           'bg-white/10 text-white/40 border-white/20'}
                       `}
                     >
@@ -423,7 +429,11 @@ function MonthlyView({ events, selectedDay, setSelectedDay, onExport, onEdit, on
                 <div className="space-y-4">
                   {getEventsForDay(selectedDay).length > 0 ? (
                     getEventsForDay(selectedDay).map((e: any) => (
-                      <div key={e.id} className="p-4 bg-white/5 rounded-[6px] border border-white/5 space-y-3 group hover:bg-white/[0.08] transition-all relative">
+                      <div 
+                        key={e.id} 
+                        onClick={() => onEdit(e)}
+                        className="p-4 bg-white/5 rounded-[6px] border border-white/5 space-y-3 group hover:bg-white/[0.08] transition-all relative cursor-pointer"
+                      >
                          <div className="flex items-center justify-between">
                            <div className="flex items-center gap-2">
                               <Clock size={14} className="text-[#9d81ff]" />
@@ -431,13 +441,10 @@ function MonthlyView({ events, selectedDay, setSelectedDay, onExport, onEdit, on
                            </div>
                            <div className="flex gap-1">
                              <button 
-                               onClick={() => onEdit(e)}
-                               className="p-1 px-2 rounded-[4px] bg-white/10 text-white/60 text-[8px] font-black hover:bg-white/20 transition-all opacity-0 group-hover:opacity-100"
-                             >
-                               EDIT
-                             </button>
-                             <button 
-                               onClick={() => onExport(e)}
+                               onClick={(ev) => {
+                                 ev.stopPropagation();
+                                 onExport(e);
+                               }}
                                className="p-1 px-2 rounded-[4px] bg-[#9d81ff]/10 text-[#9d81ff] text-[8px] font-black hover:bg-[#9d81ff] hover:text-white transition-all opacity-0 group-hover:opacity-100 flex items-center gap-1"
                              >
                                <Share2 size={8} /> OS PUSH
@@ -483,33 +490,53 @@ function MonthlyView({ events, selectedDay, setSelectedDay, onExport, onEdit, on
   );
 }
 
-function WeeklyView({ events, weekdays }: any) {
+function WeeklyView({ events, weekdays, onEdit, onAdd }: any) {
+  const getEventsForDay = (day: number) => events.filter((e: any) => e.day === day);
+  
   return (
     <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
       {/* 7-Day Agile columns */}
       <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
-        {weekdays.map((day: string, idx: number) => (
-          <div key={day} className={`glass-card p-4 border-white/5 space-y-4 ${idx === 3 || idx === 4 ? 'bg-[#9d81ff]/5 border-[#9d81ff]/20' : ''}`}>
-             <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#9d81ff]">{day}</span>
-                <span className="text-[10px] font-bold text-white/20">{19 + (idx === 0 ? -6 : idx-1)}</span>
-             </div>
-             <div className="space-y-2">
-               {(idx === 1 || idx === 3) ? (
-                 <div className="p-3 bg-white/5 rounded-[6px] border border-white/5 space-y-1">
-                   <p className="text-[9px] font-bold text-white">Study Phase: Bio</p>
-                   <div className="h-0.5 w-full bg-white/10 rounded-full">
-                     <div className="h-full w-2/3 bg-[#9d81ff] rounded-full" />
+        {weekdays.map((dayName: string, idx: number) => {
+          const dayNum = 19 + (idx === 0 ? -6 : idx-1); // Mock mapping for April 13-19 week (base 19 for today)
+          const dayEvents = getEventsForDay(dayNum);
+          
+          return (
+            <div key={dayName} className={`glass-card p-4 border-white/5 space-y-4 flex flex-col min-h-[300px] ${idx === 1 || idx === 3 ? 'bg-[#9d81ff]/5 border-[#9d81ff]/20' : ''}`}>
+               <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#9d81ff]">{dayName}</span>
+                  <span className="text-[10px] font-bold text-white/20">{dayNum}</span>
+               </div>
+               
+               <div className="space-y-2 flex-1">
+                 {dayEvents.length > 0 ? (
+                   dayEvents.map((e: any) => (
+                     <div 
+                       key={e.id} 
+                       onClick={() => onEdit(e)}
+                       className={`p-3 rounded-[6px] border cursor-pointer hover:scale-[1.02] transition-transform space-y-1
+                         ${e.type === 'academic' ? 'bg-[#9d81ff]/10 text-[#9d81ff] border-[#9d81ff]/20' : 
+                           e.type === 'wellness' ? 'bg-[#4ade80]/10 text-[#4ade80] border-[#4ade80]/20' : 
+                           e.type === 'spiritual' ? 'bg-[#f59e0b]/10 text-[#f59e0b] border-[#f59e0b]/20' :
+                           'bg-white/10 text-white/40 border-white/20'}
+                       `}
+                     >
+                       <p className="text-[9px] font-black uppercase truncate">{e.title}</p>
+                       {e.time && <p className="text-[8px] font-bold opacity-60 flex items-center gap-1"><Clock size={8} /> {e.time}</p>}
+                     </div>
+                   ))
+                 ) : (
+                   <div 
+                    onClick={() => onAdd()}
+                    className="py-12 flex flex-col items-center justify-center border border-dashed border-white/5 rounded-[6px] hover:bg-white/[0.02] cursor-pointer transition-colors"
+                   >
+                     <Plus size={14} className="text-white/10" />
                    </div>
-                 </div>
-               ) : (
-                 <div className="py-8 flex flex-col items-center justify-center border border-dashed border-white/5 rounded-[6px]">
-                   <Plus size={14} className="text-white/10" />
-                 </div>
-               )}
-             </div>
-          </div>
-        ))}
+                 )}
+               </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Bottom Section: Meal Plan & Priorities */}

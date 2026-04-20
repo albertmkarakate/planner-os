@@ -13,7 +13,10 @@ import {
   Zap,
   Save,
   Palette,
-  Plus
+  Plus,
+  Route,
+  Layers,
+  BookOpen
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -24,13 +27,17 @@ interface SettingsViewProps {
   onAccentColorChange: (color: string) => void;
   theme: 'dark' | 'light';
   onThemeChange: (theme: 'dark' | 'light') => void;
+  learningMode: 'Traditional' | 'Self-Study' | 'Project-Based';
+  onLearningModeChange: (mode: 'Traditional' | 'Self-Study' | 'Project-Based') => void;
 }
 
 export default function SettingsView({ 
   accentColor, 
   onAccentColorChange,
   theme,
-  onThemeChange
+  onThemeChange,
+  learningMode,
+  onLearningModeChange
 }: SettingsViewProps) {
   const [activeTab, setActiveTab] = useState<Tab>('ai');
   const [isSaved, setIsSaved] = useState(false);
@@ -113,7 +120,12 @@ export default function SettingsView({
                 />
               )}
               {activeTab === 'tasks' && <TasksTab />}
-              {activeTab === 'profile' && <ProfileTab />}
+              {activeTab === 'profile' && (
+                <ProfileTab 
+                  learningMode={learningMode} 
+                  onLearningModeChange={onLearningModeChange} 
+                />
+              )}
               {activeTab === 'privacy' && <PrivacyTab />}
             </motion.div>
           </AnimatePresence>
@@ -282,9 +294,51 @@ function TasksTab() {
   );
 }
 
-function ProfileTab() {
+function ProfileTab({ learningMode, onLearningModeChange }: any) {
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="space-y-4">
+        <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-[var(--color-text-primary)]/30">
+          <Brain size={14} /> Intelligence Orchestration Profile
+        </h3>
+        
+        <div className="p-6 bg-white/5 rounded-2xl border border-white/10 space-y-4">
+          <label className="text-xs font-bold text-[var(--color-text-secondary)] uppercase tracking-widest">Active Learning Mode</label>
+          <div className="grid grid-cols-1 gap-3">
+            {[
+              { id: 'Traditional', label: 'Traditional (Academic)', desc: 'Optimized for university terms and course hierarchies.', icon: BookOpen },
+              { id: 'Self-Study', label: 'Self-Study (Autodidact)', desc: 'Optimized for learning paths and mastery modules.', icon: Route },
+              { id: 'Project-Based', label: 'Project-Based (Pro)', desc: 'Optimized for active workspaces and sprint delivery.', icon: Layers }
+            ].map((m) => (
+              <button
+                key={m.id}
+                onClick={() => onLearningModeChange(m.id as any)}
+                className={`flex items-center gap-4 p-4 rounded-[6px] border transition-all text-left group ${
+                  learningMode === m.id 
+                    ? 'bg-[var(--color-accent)]/10 border-[var(--color-accent)]/30 ring-1 ring-[var(--color-accent)]/20' 
+                    : 'bg-white/5 border-white/5 hover:bg-white/10'
+                }`}
+              >
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all ${
+                  learningMode === m.id ? 'bg-[var(--color-accent)] text-white shadow-lg shadow-[var(--color-accent)]/20' : 'bg-white/5 text-white/40'
+                }`}>
+                  <m.icon size={20} />
+                </div>
+                <div className="flex-1">
+                   <h4 className={`text-sm font-bold ${learningMode === m.id ? 'text-[var(--color-accent)]' : 'text-white'}`}>{m.label}</h4>
+                   <p className="text-[10px] text-[var(--color-text-secondary)] opacity-60 leading-tight">{m.desc}</p>
+                </div>
+                {learningMode === m.id && (
+                  <div className="w-5 h-5 rounded-full bg-[var(--color-accent)] flex items-center justify-center text-white">
+                    <Check size={12} />
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
       <div className="grid gap-6">
         <div className="space-y-2">
           <label className="text-xs font-bold text-white/30 ml-1 uppercase tracking-widest">Cognitive Style</label>

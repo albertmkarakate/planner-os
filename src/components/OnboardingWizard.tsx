@@ -10,7 +10,9 @@ import {
   FileText, 
   Plus,
   Sparkles,
-  CheckCircle2
+  CheckCircle2,
+  Route,
+  Layers
 } from 'lucide-react';
 
 interface OnboardingWizardProps {
@@ -21,7 +23,7 @@ interface OnboardingWizardProps {
 export default function OnboardingWizard({ onComplete, onClose }: OnboardingWizardProps) {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
-    mode: 'student',
+    mode: 'Traditional',
     courseName: '',
     targetDate: '',
     resources: ["Pending: 'Chapter1_Networking.pdf'", "Pending: 'Exam_Objectives.docx'"]
@@ -35,11 +37,11 @@ export default function OnboardingWizard({ onComplete, onClose }: OnboardingWiza
   };
 
   const steps = [
-    { id: 1, title: 'Welcome', icon: BrainCircuit },
-    { id: 2, title: 'Architecture', icon: Rocket },
-    { id: 3, title: 'Details', icon: Calendar },
-    { id: 4, title: 'Resources', icon: FileText },
-  ];
+  { id: 1, title: 'Welcome', icon: BrainCircuit },
+  { id: 2, title: 'Architecture', icon: Layers },
+  { id: 3, title: 'Details', icon: Calendar },
+  { id: 4, title: 'Resources', icon: FileText },
+];
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-md">
@@ -103,26 +105,27 @@ export default function OnboardingWizard({ onComplete, onClose }: OnboardingWiza
                   <h3 className="text-2xl font-black tracking-tighter text-[var(--color-text-primary)]">Select Learning Architecture</h3>
                   <div className="grid grid-cols-1 gap-4">
                     {[
-                      { id: 'student', label: 'Traditional Student Mode', sub: 'Semesters & Classes focusing on university curriculum.', icon: School },
-                      { id: 'self', label: 'Self-Study & Certification Mode', sub: 'Skill Trees & Goals for independent professional growth.', icon: Rocket },
+                      { id: 'Traditional', label: 'Traditional (Academic)', sub: 'University curriculum, semesters, and course hierarchies.', icon: School },
+                      { id: 'Self-Study', label: 'Self-Study (Autodidact)', sub: 'Independent learning paths and mastery modules.', icon: Route },
+                      { id: 'Project-Based', label: 'Project-Based (Professional)', sub: 'Workspaces and deliverable-focused sprint delivery.', icon: Layers },
                     ].map((item) => (
                       <button
                         key={item.id}
                         onClick={() => setFormData({ ...formData, mode: item.id })}
-                        className={`flex items-start gap-4 p-6 rounded-2xl border-2 text-left transition-all ${
+                        className={`flex items-start gap-4 p-5 rounded-2xl border-2 text-left transition-all ${
                           formData.mode === item.id 
                             ? 'bg-[var(--color-accent)]/10 border-[var(--color-accent)]' 
                             : 'bg-white/5 border-transparent hover:bg-white/10'
                         }`}
                       >
                         <div className={`p-3 rounded-xl ${formData.mode === item.id ? 'bg-[var(--color-accent)] text-white' : 'bg-white/10 text-[var(--color-text-secondary)]'}`}>
-                          <item.icon size={24} />
+                          <item.icon size={20} />
                         </div>
                         <div>
-                          <p className={`font-bold ${formData.mode === item.id ? 'text-[var(--color-text-primary)]' : 'text-[var(--color-text-secondary)]'}`}>{item.label}</p>
-                          <p className="text-xs text-[var(--color-text-secondary)] opacity-60">{item.sub}</p>
+                          <p className={`text-sm font-bold ${formData.mode === item.id ? 'text-[var(--color-text-primary)]' : 'text-[var(--color-text-secondary)]'}`}>{item.label}</p>
+                          <p className="text-[10px] text-[var(--color-text-secondary)] opacity-60">{item.sub}</p>
                         </div>
-                        {formData.mode === item.id && <CheckCircle2 className="ml-auto text-[var(--color-accent)]" size={20} />}
+                        {formData.mode === item.id && <CheckCircle2 className="ml-auto text-[var(--color-accent)]" size={18} />}
                       </button>
                     ))}
                   </div>

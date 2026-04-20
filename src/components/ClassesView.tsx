@@ -36,7 +36,52 @@ const CLASSES = [
   { id: "3", name: "History of Art", semester: "Semester 1", color: "#3B82F6" },
 ];
 
-export default function ClassesView() {
+interface ClassesViewProps {
+  learningMode: 'Traditional' | 'Self-Study' | 'Project-Based';
+}
+
+export default function ClassesView({ learningMode }: ClassesViewProps) {
+  const getLabels = () => {
+    switch (learningMode) {
+      case 'Traditional':
+        return {
+          portfolio: 'Academic Portfolio',
+          parent: 'Semester',
+          module: 'Course',
+          action: 'Incorporate Course',
+          repository: 'Course Material Repository',
+          annex: 'Annex New Resource',
+          burnup: 'Semester Burnup',
+          burnupDesc: 'major milestones for this semester'
+        };
+      case 'Self-Study':
+        return {
+          portfolio: 'Learning Matrix',
+          parent: 'Path',
+          module: 'Pathway',
+          action: 'Initialize Pathway',
+          repository: 'Material Database',
+          annex: 'Queue Asset',
+          burnup: 'Path Progress',
+          burnupDesc: 'mastery milestones for this path'
+        };
+      case 'Project-Based':
+      default:
+        return {
+          portfolio: 'Workstream Matrix',
+          parent: 'Sprint',
+          module: 'Workspace',
+          action: 'Spin up Workspace',
+          repository: 'Asset Pipeline',
+          annex: 'Ingest Deliverable',
+          burnup: 'Sprint Velocity',
+          burnupDesc: 'deliverables for this sprint'
+        };
+    }
+  };
+
+  const labels = getLabels();
+
   const [classes, setClasses] = useState<any[]>(() => {
     const saved = localStorage.getItem("planner_classes");
     if (saved) return JSON.parse(saved);
@@ -74,7 +119,7 @@ export default function ClassesView() {
       setClassForm({ name: cls.name, semester: cls.semester, color: cls.color });
     } else {
       setEditingClass(null);
-      setClassForm({ name: "", semester: "Semester 1", color: "#3B82F6" });
+      setClassForm({ name: "", semester: `${labels.parent} 1`, color: "#3B82F6" });
     }
     setShowClassModal(true);
   };
@@ -265,7 +310,7 @@ export default function ClassesView() {
       <div className="md:col-span-1 space-y-6">
         <div className="flex items-center justify-between ml-2">
           <h2 className="text-xs font-black uppercase tracking-[0.2em] text-[var(--color-text-secondary)]">
-            Academic Portfolio
+            {labels.portfolio}
           </h2>
           <button
             onClick={() => openClassModal()}
@@ -307,7 +352,7 @@ export default function ClassesView() {
                     {cls.name}
                   </p>
                   <p className="text-[10px] text-[var(--color-text-secondary)] opacity-50 uppercase font-black tracking-tighter">
-                    {cls.semester}
+                    {cls.semester.replace('Semester', labels.parent).replace('Path', labels.parent).replace('Sprint', labels.parent)}
                   </p>
                 </div>
               </div>
@@ -333,7 +378,7 @@ export default function ClassesView() {
             className="w-full p-5 rounded-[6px] border border-dashed border-black/10 dark:border-white/5 hover:border-black/20 dark:hover:border-white/20 flex items-center justify-center gap-2 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-all hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
           >
             <Plus size={18} />{" "}
-            <span className="text-sm font-bold">Incorporate Module</span>
+            <span className="text-sm font-bold">{labels.action}</span>
           </button>
         </div>
 
@@ -341,7 +386,7 @@ export default function ClassesView() {
         <div className="p-6 glass-card bg-[var(--color-accent)]/[0.05] border-[var(--color-accent)]/[0.1] space-y-4">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-accent)]">
-              Semester Burnup
+              {labels.burnup}
             </span>
             <span className="text-xs font-bold text-[var(--color-text-primary)]">
               64%
@@ -351,7 +396,7 @@ export default function ClassesView() {
             <div className="h-full w-[64%] bg-[var(--color-accent)] rounded-full shadow-[0_0_8px_var(--color-accent)]" />
           </div>
           <p className="text-[10px] text-[var(--color-text-secondary)] italic leading-tight">
-            "You've completed 4 of 7 major milestones for this semester."
+            "You've completed 4 of 7 {labels.burnupDesc}."
           </p>
         </div>
       </div>
@@ -651,7 +696,7 @@ export default function ClassesView() {
                   <div className="p-8 glass-card space-y-6">
                     <div className="flex items-center justify-between">
                       <h3 className="text-xs font-black uppercase tracking-widest text-[var(--color-text-secondary)]">
-                        Module Repository
+                        {labels.repository}
                       </h3>
                       <span className="text-[10px] font-bold text-[var(--color-text-secondary)] opacity-30">
                         3 Items
@@ -683,7 +728,7 @@ export default function ClassesView() {
                       ))}
                     </div>
                     <button className="w-full py-4 border-2 border-dashed border-black/5 dark:border-white/5 rounded-[6px] text-[var(--color-text-secondary)] opacity-30 text-xs font-black uppercase tracking-widest hover:opacity-100 transition-all">
-                      Annex New Resource
+                      {labels.annex}
                     </button>
                   </div>
                 </div>
@@ -767,7 +812,7 @@ export default function ClassesView() {
             {activeTab === "notes" && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {[
-                  { name: "Semester 1 Lectures", items: 12 },
+                  { name: `${labels.parent} 1 Lectures`, items: 12 },
                   { name: "Research Papers", items: 5 },
                   { name: "Exam Prep Drafts", items: 3 },
                 ].map((folder, i) => (

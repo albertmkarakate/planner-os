@@ -14,6 +14,9 @@ import {
   AlertCircle,
   BrainCircuit,
   Settings,
+  Route,
+  Layers,
+  LayoutGrid,
   Sun,
   Moon,
   Search,
@@ -46,12 +49,14 @@ interface NavGroup {
   items: NavItem[];
 }
 
+export type LearningMode = 'Traditional' | 'Self-Study' | 'Project-Based';
+
 export default function App() {
   const [activeSection, setActiveSection] = useState<Section>('briefing');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [theme, setTheme] = useState<'dark' | 'light' | 'system'>(() => (localStorage.getItem('planner_theme') as any) || 'dark');
   const [accentColor, setAccentColor] = useState(() => localStorage.getItem('planner_accent') || '#9d81ff');
-  const [mode, setMode] = useState<'student' | 'self'>(() => (localStorage.getItem('planner_mode') as any) || 'student');
+  const [learningMode, setLearningMode] = useState<LearningMode>(() => (localStorage.getItem('planner_learning_mode') as LearningMode) || 'Traditional');
   const [showWizard, setShowWizard] = useState(() => !localStorage.getItem('planner_setup_complete'));
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
 
@@ -82,16 +87,45 @@ export default function App() {
     localStorage.setItem('planner_accent', accentColor);
   }, [accentColor]);
 
+  const getNavConfig = () => {
+    switch (learningMode) {
+      case 'Traditional':
+        return {
+          group: 'Terms & Courses',
+          icon: BookOpen,
+          calendar: 'Academic Calendar',
+          tracker: 'Semesters (1-8)'
+        };
+      case 'Self-Study':
+        return {
+          group: 'Learning Paths',
+          icon: Route,
+          calendar: 'Skill Tree Timeline',
+          tracker: 'Mastery Modules'
+        };
+      case 'Project-Based':
+      default:
+        return {
+          group: 'Workspaces',
+          icon: Layers,
+          calendar: 'Project Roadmap',
+          tracker: 'Sprint Boards'
+        };
+    }
+  };
+
+  const navConfig = getNavConfig();
+
   const navGroups: NavGroup[] = [
     {
       label: null,
       items: [{ id: 'briefing', label: 'AI Daily Briefing', icon: LayoutDashboard }]
     },
     {
-      label: mode === 'student' ? 'Academic' : 'Curriculum',
+      label: navConfig.group,
       items: [
-        { id: 'calendar', label: mode === 'student' ? 'Academic Calendar' : 'Skill Tree Timeline', icon: Calendar },
-        { id: 'classes', label: mode === 'student' ? 'Semesters (1-8)' : 'Mastery Modules', icon: BookOpen },
+        { id: 'calendar', label: navConfig.calendar, icon: Calendar },
+        { id: 'classes', label: navConfig.tracker, icon: navConfig.icon },
       ]
     },
     {
@@ -122,7 +156,7 @@ export default function App() {
     switch (activeSection) {
       case 'briefing': return <BriefingView />;
       case 'calendar': return <CalendarView />;
-      case 'classes': return <ClassesView />;
+      case 'classes': return <ClassesView learningMode={learningMode} />;
       case 'wellness': return <WellnessView />;
       case 'productivity': return <ProductivityView />;
       case 'finance': return <FinanceView />;
@@ -136,6 +170,11 @@ export default function App() {
             onAccentColorChange={setAccentColor}
             theme={theme}
             onThemeChange={setTheme}
+            learningMode={learningMode}
+            onLearningModeChange={(m) => {
+              setLearningMode(m);
+              localStorage.setItem('planner_learning_mode', m);
+            }}
           />
         );
       default: return <BriefingView />;
@@ -144,8 +183,8 @@ export default function App() {
 
   const handleWizardComplete = (data: any) => {
     console.log('Setup Complete:', data);
-    setMode(data.mode);
-    localStorage.setItem('planner_mode', data.mode);
+    setLearningMode(data.mode);
+    localStorage.setItem('planner_learning_mode', data.mode);
     localStorage.setItem('planner_setup_complete', 'true');
     setShowWizard(false);
   };
@@ -257,7 +296,7 @@ export default function App() {
           {/* Breadcrumb Titling */}
           <div className="flex flex-col">
             <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.2em] text-[var(--color-text-secondary)] mb-1">
-              <span>Student Planner</span> 
+              <span>{learningMode === 'Traditional' ? 'Academic Planner' : learningMode === 'Self-Study' ? 'Autodidact OS' : 'Professional Workstream'}</span> 
               <ChevronRight size={10} className="opacity-50" />
               <span className="text-[var(--color-text-primary)]">{allItems.find(n => n.id === activeSection)?.label || 'Settings'}</span>
             </div>
@@ -270,7 +309,7 @@ export default function App() {
                <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)] opacity-50" />
                <input 
                  type="text" 
-                 placeholder="Search notes, tasks, or classes..."
+                 placeholder={`Search notes, tasks, or ${learningMode === 'Traditional' ? 'courses' : learningMode === 'Self-Study' ? 'paths' : 'workspaces'}...`}
                  className="w-[250px] bg-black/5 dark:bg-white/5 border-none outline-none rounded-full pl-10 pr-4 py-2.5 text-xs text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]/30 focus:ring-1 focus:ring-[var(--color-accent)] transition-all"
                />
              </div>

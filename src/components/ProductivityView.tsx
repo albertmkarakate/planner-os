@@ -528,14 +528,55 @@ function WheelOfLife() {
     { subject: 'Hobbies', A: 40, fullMark: 100 },
   ]);
 
+  const [isHovering, setIsHovering] = useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  const updateValue = (index: number, val: number) => {
+    setData(prev => prev.map((item, i) => i === index ? { ...item, A: Math.min(100, Math.max(0, val)) } : item));
+  };
+
+  const handleChartClick = (event: React.MouseEvent) => {
+    if (!containerRef.current) return;
+    
+    const rect = containerRef.current.getBoundingClientRect();
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const x = event.clientX - rect.left - centerX;
+    const y = event.clientY - rect.top - centerY;
+    
+    // Calculate angle in degrees, adjusted so 0 is top
+    let angle = (Math.atan2(y, x) * 180) / Math.PI + 90;
+    if (angle < 0) angle += 360;
+    
+    // Each segment is 60 degrees (360/6)
+    // Categories are centered at 0, 60, 120, 180, 240, 300
+    // We adjust by 30 to find the closest segment
+    const segmentIndex = Math.round(angle / 60) % 6;
+    
+    // Distance from center determines the value (max radius is roughly 40-45% of min(w,h))
+    const distance = Math.sqrt(x * x + y * y);
+    const maxRadius = Math.min(centerX, centerY) * 0.8;
+    const newValue = Math.round((distance / maxRadius) * 100);
+    
+    updateValue(segmentIndex, newValue);
+  };
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-6">
-      <div className="p-8 glass-card space-y-8 flex flex-col items-center justify-center min-h-[500px]">
+      <div 
+        className="p-8 glass-card space-y-8 flex flex-col items-center justify-center min-h-[500px] relative group"
+        onMouseEnter={() => setIsHovering(true)}
+        onMouseLeave={() => setIsHovering(false)}
+      >
         <div className="w-full">
            <h3 className="text-xs font-black uppercase tracking-widest text-white/30 text-center mb-8">Wheel of Life Optimization</h3>
         </div>
         
-        <div className="w-full h-80">
+        <div 
+          className="w-full h-80 relative cursor-crosshair" 
+          ref={containerRef}
+          onClick={handleChartClick}
+        >
           <ResponsiveContainer width="100%" height="100%">
             <RadarChart cx="50%" cy="50%" outerRadius="80%" data={data}>
               <PolarGrid stroke="rgba(255,255,255,0.1)" />
@@ -547,12 +588,27 @@ function WheelOfLife() {
                 stroke="#9d81ff"
                 fill="#9d81ff"
                 fillOpacity={0.6}
+                isAnimationActive={false}
               />
             </RadarChart>
           </ResponsiveContainer>
+
+          <AnimatePresence>
+            {isHovering && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute top-2 left-2 p-2 bg-white/5 border border-white/10 rounded-lg backdrop-blur-md pointer-events-none"
+              >
+                <p className="text-[10px] font-black uppercase text-[#9d81ff] tracking-widest">Interactive Mode</p>
+                <p className="text-[9px] text-white/40">Click segments to calibrate</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
-        <p className="text-center text-sm font-bold text-white/40 italic px-8">
+        <p className="text-center text-sm font-bold text-white/40 italic px-8 leading-relaxed">
           "Your Wheel reveals a strong lean towards Academics. We recommend 20% more focus on Social & Hobbies to maintain long-term burnout resistance."
         </p>
       </div>
@@ -562,32 +618,59 @@ function WheelOfLife() {
         <div className="space-y-6">
           {data.map((item, i) => (
             <div key={i} className="space-y-3">
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center px-1">
                 <span className="text-sm font-bold text-white tracking-tight">{item.subject}</span>
-                <span className="text-xs font-mono text-[#9d81ff]">{item.A}%</span>
+                <span className="text-xs font-mono text-[#9d81ff] bg-[#9d81ff]/10 px-2 py-0.5 rounded-full">{item.A}%</span>
               </div>
-              <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+              
+              <div className="relative h-4 flex items-center group">
+                <div className="absolute inset-0 h-1 bg-white/5 rounded-full" />
                 <motion.div 
                   initial={{ width: 0 }}
                   animate={{ width: `${item.A}%` }}
-                  className="h-full bg-[#9d81ff] rounded-full shadow-[0_0_10px_#9d81ff]" 
+                  className="absolute left-0 h-1 bg-[#9d81ff] rounded-full shadow-[0_0_8px_#9d81ff]" 
+                />
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="100" 
+                  value={item.A} 
+                  onChange={(e) => updateValue(i, parseInt(e.target.value))}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                />
+                <motion.div 
+                  className="absolute w-3 h-3 rounded-full bg-white border border-[#9d81ff] shadow-xl pointer-events-none z-20"
+                  animate={{ left: `calc(${item.A}% - 6px)` }}
                 />
               </div>
             </div>
           ))}
         </div>
         
-        <div className="pt-8 space-y-4">
-           <h4 className="text-xs font-bold uppercase text-white/20">Proactive Goal Setting</h4>
-           <div className="p-4 bg-white/5 rounded-2xl border border-white/10 space-y-3">
-             <div className="flex items-center gap-3">
-               <Star size={16} className="text-amber-400" />
-               <p className="text-xs font-bold text-white">Balanced Student Badge Progress</p>
+        <div className="pt-8 space-y-4 text-left">
+           <h4 className="text-xs font-bold uppercase text-white/20 px-1">Proactive Goal Setting</h4>
+           <div className="p-5 bg-white/5 rounded-2xl border border-white/10 space-y-4">
+             <div className="flex items-center justify-between">
+               <div className="flex items-center gap-3">
+                 <div className="p-2 bg-amber-400/10 rounded-lg">
+                    <Star size={14} className="text-amber-400" />
+                 </div>
+                 <p className="text-xs font-bold text-white">Balanced Student Badge</p>
+               </div>
+               <span className="text-[10px] font-mono text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full">
+                 {Math.round((data.filter(d => d.A >= 50).length / data.length) * 100)}%
+               </span>
              </div>
-             <div className="h-1 w-full bg-white/10 rounded-full">
-               <div className="h-full w-[65%] bg-amber-400 rounded-full" />
+             <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+               <motion.div 
+                 animate={{ width: `${(data.filter(d => d.A >= 50).length / data.length) * 100}%` }}
+                 className="h-full bg-gradient-to-r from-amber-600 to-amber-400 rounded-full shadow-[0_0_10px_rgba(251,191,36,0.2)]" 
+               />
              </div>
-             <p className="text-[10px] text-white/40">Earned by keeping all sectors above 50% for 30 consecutive days.</p>
+             <p className="text-[10px] text-white/30 leading-relaxed font-medium">
+               Earned by keeping all sectors above <span className="text-white/60">50%</span> for 30 consecutive days. 
+               ({data.filter(d => d.A >= 50).length}/{data.length} sectors qualified)
+             </p>
            </div>
         </div>
       </div>
