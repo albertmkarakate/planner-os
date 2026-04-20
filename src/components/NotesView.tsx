@@ -26,20 +26,63 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   generateCreatorTemplate, 
   gradeFeynmanExplanation, 
-  generateElaborativeQuestions 
+  generateElaborativeQuestions,
+  ai
 } from '../lib/gemini';
 
 type EditorMode = 'text' | 'dual';
 type ToolTab = 'recall' | 'feynman' | 'deepdive' | 'chat';
 
+interface FeynmanResult {
+  clarityScore: number;
+  accuracyScore: number;
+  feedback: string;
+  suggestions: string[];
+}
+
 export default function NotesView() {
-  const [notes, setNotes] = useState([
-    { id: '1', title: 'Biology: Cell Structure', date: '2h ago', content: 'The cell is the basic structural, functional, and biological unit of all known organisms. Cells are the smallest units of life, and hence are often referred to as the "building blocks of life".' },
-    { id: '2', title: 'History: WWII Origins', date: 'Yesterday', content: 'World War II was the deadliest conflict in human history, involving the vast majority of the worlds countries and every inhabited continent.' },
-    { id: '3', title: 'Math: Calculus Derivatives', date: 'Apr 15', content: 'In calculus, the derivative of a function of a real variable measures the sensitivity to change of the function value with respect to a change in its argument.' },
-  ]);
+  const [notes, setNotes] = useState<{id: string, title: string, date: string, content: string}[]>(() => {
+    const saved = localStorage.getItem('knowledge_notes');
+    if (saved) return JSON.parse(saved);
+    return [
+      { id: '1', title: 'Biology: Cell Structure', date: '2h ago', content: 'The cell is the basic structural, functional, and biological unit of all known organisms. Cells are the smallest units of life, and hence are often referred to as the "building blocks of life".' },
+      { id: '2', title: 'History: WWII Origins', date: 'Yesterday', content: 'World War II was the deadliest conflict in human history, involving the vast majority of the worlds countries and every inhabited continent.' },
+      { id: '3', title: 'Math: Calculus Derivatives', date: 'Apr 15', content: 'In calculus, the derivative of a function of a real variable measures the sensitivity to change of the function value with respect to a change in its argument.' },
+    ];
+  });
 
   const [activeNoteId, setActiveNoteId] = useState<string>('1');
+
+  useEffect(() => {
+    localStorage.setItem('knowledge_notes', JSON.stringify(notes));
+  }, [notes]);
+
+  const activeNote = notes.find(n => n.id === activeNoteId) || notes[0];
+
+  const handleUpdateNote = (id: string, updates: Partial<typeof notes[0]>) => {
+    setNotes(prev => prev.map(n => n.id === id ? { ...n, ...updates, date: 'Just now' } : n));
+  };
+
+  const handleAddNote = () => {
+    const newNote = {
+      id: Math.random().toString(36).substr(2, 9),
+      title: 'Untitled Capsule',
+      date: 'Just now',
+      content: ''
+    };
+    setNotes(prev => [newNote, ...prev]);
+    setActiveNoteId(newNote.id);
+  };
+
+  const handleDeleteNote = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (notes.length <= 1) return;
+    setNotes(prev => {
+      const filtered = prev.filter(n => n.id !== id);
+      if (activeNoteId === id) setActiveNoteId(filtered[0].id);
+      return filtered;
+    });
+  };
   const [editorMode, setEditorMode] = useState<EditorMode>('text');
   const [activeTool, setActiveTool] = useState<ToolTab>('recall');
   
@@ -71,11 +114,9 @@ export default function NotesView() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const activeNote = notes.find(n => n.id === activeNoteId) || notes[0];
-
   // Cognitive Tool Logic (Methods 6 & 7)
   const [feynmanInput, setFeynmanInput] = useState('');
-  const [feynmanAnalysis, setFeynmanAnalysis] = useState('');
+  const [feynmanAnalysis, setFeynmanAnalysis] = useState<FeynmanResult | null>(null);
   const [isFeynmanLoading, setIsFeynmanLoading] = useState(false);
   const [elaborativeQuestions, setElaborativeQuestions] = useState<string[]>([]);
   const [isElaborateLoading, setIsElaborateLoading] = useState(false);
@@ -83,9 +124,14 @@ export default function NotesView() {
   const handleFeynmanCheck = async () => {
     if (!feynmanInput.trim()) return;
     setIsFeynmanLoading(true);
-    const result = await gradeFeynmanExplanation(feynmanInput);
-    setFeynmanAnalysis(result || "Evaluation failed.");
-    setIsFeynmanLoading(false);
+    try {
+      const result = await gradeFeynmanExplanation(feynmanInput);
+      setFeynmanAnalysis(result);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsFeynmanLoading(false);
+    }
   };
 
   const handleDeepDive = async () => {
@@ -111,8 +157,12 @@ export default function NotesView() {
     const prompt = `You are an expert, encouraging Socratic tutor. Here are the student's current notes: ${activeNote.content}. The student says: ${msg}. If they ask for an explanation, use analogies. DO NOT just give them the answers; ask guiding questions to test their understanding.`;
     
     try {
-      const response = await gradeFeynmanExplanation(prompt); 
-      setChatMessages(prev => [...prev, { sender: 'AI', text: response || "I'm having trouble connecting right now." }]);
+      // NOTE: Using a simple completion for chat
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt
+      });
+      setChatMessages(prev => [...prev, { sender: 'AI', text: response.text || "I'm having trouble connecting right now." }]);
     } catch (err) {
       console.error("Chat Error:", err);
     } finally {
@@ -155,7 +205,10 @@ export default function NotesView() {
               </button>
             </div>
           </div>
-          <button className="flex items-center gap-2 px-5 py-2.5 bg-[#9d81ff] text-white rounded-[6px] font-bold text-xs uppercase tracking-widest hover:shadow-xl hover:shadow-[#9d81ff]/20 transition-all shadow-lg">
+          <button 
+            onClick={handleAddNote}
+            className="flex items-center gap-2 px-5 py-2.5 bg-[#9d81ff] text-white rounded-[6px] font-bold text-xs uppercase tracking-widest hover:shadow-xl hover:shadow-[#9d81ff]/20 transition-all shadow-lg"
+          >
             <Plus size={16} /> Create New Capsule
           </button>
         </div>
@@ -173,18 +226,25 @@ export default function NotesView() {
             </div>
             <div className="flex-1 space-y-2 overflow-y-auto custom-scrollbar pr-2">
               {notes.map(note => (
-                <button
-                  key={note.id}
-                  onClick={() => setActiveNoteId(note.id)}
-                  className={`w-full text-left p-3 rounded-[6px] transition-all group ${
-                    activeNoteId === note.id 
-                      ? 'bg-[#9d81ff] text-white shadow-lg' 
-                      : 'bg-white/5 text-white/40 hover:bg-white/10'
-                  }`}
-                >
-                  <div className="text-xs font-bold truncate">{note.title}</div>
-                  <div className={`text-[9px] mt-1 ${activeNoteId === note.id ? 'text-white/60' : 'text-white/20'}`}>{note.date}</div>
-                </button>
+                <div key={note.id} className="relative group">
+                  <button
+                    onClick={() => setActiveNoteId(note.id)}
+                    className={`w-full text-left p-3 rounded-[6px] transition-all ${
+                      activeNoteId === note.id 
+                        ? 'bg-[#9d81ff] text-white shadow-lg' 
+                        : 'bg-white/5 text-white/40 hover:bg-white/10'
+                    }`}
+                  >
+                    <div className="text-xs font-bold truncate pr-6">{note.title}</div>
+                    <div className={`text-[9px] mt-1 ${activeNoteId === note.id ? 'text-white/60' : 'text-white/20'}`}>{note.date}</div>
+                  </button>
+                  <button 
+                    onClick={(e) => handleDeleteNote(note.id, e)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-white/20 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                  >
+                    <Plus className="rotate-45" size={14} />
+                  </button>
+                </div>
               ))}
             </div>
             <button className="w-full py-3 bg-white/5 border border-white/10 rounded-[6px] text-white/40 flex items-center justify-center gap-2 hover:bg-white/10 transition-all group">
@@ -203,8 +263,8 @@ export default function NotesView() {
                 <input 
                   type="text" 
                   value={activeNote.title}
-                  readOnly
-                  className="bg-transparent border-none outline-none text-sm font-bold text-white w-64"
+                  onChange={(e) => handleUpdateNote(activeNote.id, { title: e.target.value })}
+                  className="bg-transparent border-none outline-none text-sm font-bold text-white w-64 focus:border-b focus:border-[#9d81ff]/50 transition-all"
                 />
               </div>
               <div className="flex bg-black/20 p-1 rounded-[6px] border border-white/5">
@@ -231,7 +291,8 @@ export default function NotesView() {
               <div className={`p-8 custom-scrollbar overflow-y-auto ${editorMode === 'dual' ? 'w-1/2 border-r border-white/5' : 'w-full'}`}>
                 <textarea 
                   className="w-full h-full bg-transparent border-none outline-none resize-none text-base leading-relaxed text-white/70 font-medium placeholder:text-white/10"
-                  defaultValue={activeNote.content}
+                  value={activeNote.content}
+                  onChange={(e) => handleUpdateNote(activeNote.id, { content: e.target.value })}
                   placeholder="Initiating cognitive capture... Use #tags to map intelligence nodes."
                 />
               </div>
@@ -324,8 +385,31 @@ export default function NotesView() {
                         onChange={(e) => setFeynmanInput(e.target.value)}
                       />
                       {feynmanAnalysis && (
-                        <div className="p-3 bg-[#9d81ff]/10 rounded-[6px] border border-[#9d81ff]/20 text-[10px] text-white/70 italic leading-relaxed max-h-32 overflow-y-auto">
-                          {feynmanAnalysis}
+                        <div className="space-y-3 overflow-y-auto max-h-64 pr-1 custom-scrollbar">
+                          <div className="grid grid-cols-2 gap-2">
+                             <div className="p-2 bg-white/5 rounded border border-white/5 text-center">
+                               <p className="text-[8px] font-black uppercase text-white/30 mb-1 tracking-tighter">Clarity</p>
+                               <p className={`text-sm font-black ${feynmanAnalysis.clarityScore > 7 ? 'text-green-400' : 'text-yellow-400'}`}>{feynmanAnalysis.clarityScore}/10</p>
+                             </div>
+                             <div className="p-2 bg-white/5 rounded border border-white/5 text-center">
+                               <p className="text-[8px] font-black uppercase text-white/30 mb-1 tracking-tighter">Accuracy</p>
+                               <p className={`text-sm font-black ${feynmanAnalysis.accuracyScore > 7 ? 'text-green-400' : 'text-yellow-400'}`}>{feynmanAnalysis.accuracyScore}/10</p>
+                             </div>
+                          </div>
+                          <div className="p-3 bg-[#9d81ff]/10 rounded-[6px] border border-[#9d81ff]/20 text-[10px] text-white/70 italic leading-relaxed">
+                            {feynmanAnalysis.feedback}
+                          </div>
+                          {feynmanAnalysis.suggestions.length > 0 && (
+                            <div className="space-y-1">
+                               <p className="text-[8px] font-black uppercase text-white/30">Suggestions</p>
+                               {feynmanAnalysis.suggestions.map((s: string, i: number) => (
+                                 <div key={i} className="flex gap-2 items-start">
+                                   <div className="w-1 h-1 rounded-full bg-[#9d81ff] mt-1.5 shrink-0" />
+                                   <p className="text-[9px] text-white/50">{s}</p>
+                                 </div>
+                               ))}
+                            </div>
+                          )}
                         </div>
                       )}
                       <button 
@@ -344,7 +428,7 @@ export default function NotesView() {
                          <span className="text-[9px] font-black text-white/30 uppercase tracking-widest">Interrogation Loop</span>
                          <Plus size={14} className="text-white/20" />
                       </div>
-                      <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                      <div className="space-y-2 max-h-64 overflow-y-auto pr-1 custom-scrollbar">
                         {(elaborativeQuestions.length > 0 ? elaborativeQuestions : [
                           "Why does the Mitochondria produce ATP in this specific phase?",
                           "How does this relate to the metabolic goals of the organism?"

@@ -10,7 +10,8 @@ import {
   Download, 
   TrendingUp,
   BarChart3,
-  MoreHorizontal
+  MoreHorizontal,
+  Plus
 } from 'lucide-react';
 import { EmptyState } from './ui/EmptyState';
 import { 
@@ -67,20 +68,129 @@ const renderActiveShape = (props: any) => {
 };
 
 export default function FinanceView() {
-  const [activeTab, setActiveTab] = useState<'ledger' | 'analytics'>('ledger');
-  const [transactions, setTransactions] = useState([
-    { id: 1, title: 'Campus Bookstore', cat: 'Textbooks', amount: -64.20, date: '2026-04-19' },
-    { id: 2, title: 'Local Coffee', cat: 'Food', amount: -4.50, date: '2026-04-19' },
-    { id: 3, title: 'Monthly Scholarship', cat: 'Income', amount: 500.00, date: '2026-04-18' },
-    { id: 4, title: 'Student Rent', cat: 'Housing', amount: -800.00, date: '2026-04-17' },
-    { id: 5, title: 'Groceries Store', cat: 'Food', amount: -82.30, date: '2026-04-15' },
-    { id: 6, title: 'Freelance Design', cat: 'Income', amount: 250.00, date: '2026-04-14' },
-  ]);
+  const [activeTab, setActiveTab] = useState<"ledger" | "analytics">("ledger");
+  const [transactions, setTransactions] = useState<any[]>(() => {
+    const saved = localStorage.getItem("planner_finance");
+    if (saved) return JSON.parse(saved);
+    return [
+      {
+        id: 1,
+        title: "Campus Bookstore",
+        cat: "Textbooks",
+        amount: -64.2,
+        date: "2026-04-19",
+      },
+      {
+        id: 2,
+        title: "Local Coffee",
+        cat: "Food",
+        amount: -4.5,
+        date: "2026-04-19",
+      },
+      {
+        id: 3,
+        title: "Monthly Scholarship",
+        cat: "Income",
+        amount: 500.0,
+        date: "2026-04-18",
+      },
+      {
+        id: 4,
+        title: "Student Rent",
+        cat: "Housing",
+        amount: -800.0,
+        date: "2026-04-17",
+      },
+      {
+        id: 5,
+        title: "Groceries Store",
+        cat: "Food",
+        amount: -82.3,
+        date: "2026-04-15",
+      },
+      {
+        id: 6,
+        title: "Freelance Design",
+        cat: "Income",
+        amount: 250.0,
+        date: "2026-04-14",
+      },
+    ];
+  });
+
+  const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<any>(null);
+  const [transactionForm, setTransactionForm] = useState({
+    title: "",
+    cat: "Food",
+    amount: "",
+    date: new Date().toISOString().split("T")[0],
+  });
+
+  React.useEffect(() => {
+    localStorage.setItem("planner_finance", JSON.stringify(transactions));
+  }, [transactions]);
+
+  const openTransactionModal = (t: any = null) => {
+    if (t) {
+      setEditingTransaction(t);
+      setTransactionForm({
+        title: t.title,
+        cat: t.cat,
+        amount: Math.abs(t.amount).toString(),
+        date: t.date,
+      });
+    } else {
+      setEditingTransaction(null);
+      setTransactionForm({
+        title: "",
+        cat: "Food",
+        amount: "",
+        date: new Date().toISOString().split("T")[0],
+      });
+    }
+    setShowTransactionModal(true);
+  };
+
+  const handleSaveTransaction = () => {
+    if (!transactionForm.title.trim() || !transactionForm.amount) return;
+    const amountVal = parseFloat(transactionForm.amount);
+    const finalAmount = transactionForm.cat === "Income" ? amountVal : -amountVal;
+
+    if (editingTransaction) {
+      setTransactions((prev) =>
+        prev.map((t) =>
+          t.id === editingTransaction.id
+            ? { ...t, ...transactionForm, amount: finalAmount }
+            : t,
+        ),
+      );
+    } else {
+      const newT = {
+        id: Date.now(),
+        ...transactionForm,
+        amount: finalAmount,
+      };
+      setTransactions((prev) => [newT, ...prev]);
+    }
+    setShowTransactionModal(false);
+  };
+
+  const handleDeleteTransaction = (id: number) => {
+    setTransactions((prev) => prev.filter((t) => t.id !== id));
+    setShowTransactionModal(false);
+  };
 
   const stats = {
-    balance: 2100.00,
-    income: 1850.00,
-    expenses: 1250.00
+    balance: transactions.reduce((acc, t) => acc + t.amount, 0),
+    income: transactions
+      .filter((t) => t.amount > 0)
+      .reduce((acc, t) => acc + t.amount, 0),
+    expenses: Math.abs(
+      transactions
+        .filter((t) => t.amount < 0)
+        .reduce((acc, t) => acc + t.amount, 0),
+    ),
   };
 
   return (
@@ -164,7 +274,10 @@ export default function FinanceView() {
                     <button className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-3 bg-white/5 border border-white/10 rounded-2xl text-xs font-bold text-white/60 hover:text-white transition-all">
                       <Download size={16} /> Export
                     </button>
-                    <button className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-[#9d81ff] text-white rounded-2xl text-xs font-bold shadow-lg shadow-[#9d81ff]/20 hover:scale-[1.02] active:scale-95 transition-all">
+                    <button 
+                      onClick={() => openTransactionModal()}
+                      className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-[#9d81ff] text-white rounded-2xl text-xs font-bold shadow-lg shadow-[#9d81ff]/20 hover:scale-[1.02] active:scale-95 transition-all"
+                    >
                       Add Entry
                     </button>
                  </div>
@@ -206,7 +319,10 @@ export default function FinanceView() {
                             </td>
                             <td className="px-6 py-5 text-xs font-mono text-white/30 tracking-tighter uppercase">{t.date}</td>
                             <td className="px-6 py-5">
-                               <button className="p-2 text-white/20 hover:text-[#9d81ff] transition-colors">
+                               <button 
+                                 onClick={() => openTransactionModal(t)}
+                                 className="p-2 text-white/20 hover:text-[#9d81ff] transition-colors"
+                               >
                                  <MoreHorizontal size={18} />
                                </button>
                             </td>
@@ -314,6 +430,147 @@ export default function FinanceView() {
             </div>
           )}
         </motion.div>
+      </AnimatePresence>
+      <AnimatePresence>
+        {showTransactionModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-md"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              className="w-full max-w-md bg-[#1a1a24] border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
+            >
+              <div className="p-6 border-b border-white/5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#4ade80]/10 flex items-center justify-center text-[#4ade80]">
+                    <CreditCard size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-white text-lg leading-none">
+                      {editingTransaction ? "Refactor Entry" : "New Capital Log"}
+                    </h3>
+                    <p className="text-[10px] font-black uppercase text-white/30 tracking-widest mt-1">
+                      Financial Registry
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowTransactionModal(false)}
+                  className="p-2 hover:bg-white/5 rounded-lg transition-all text-white/40 hover:text-white"
+                >
+                  <Plus className="rotate-45" size={24} />
+                </button>
+              </div>
+
+              <div className="p-8 space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">
+                    Vendor / Description
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Campus Bookstore"
+                    value={transactionForm.title}
+                    onChange={(e) =>
+                      setTransactionForm({
+                        ...transactionForm,
+                        title: e.target.value,
+                      })
+                    }
+                    className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-sm text-white outline-none focus:border-[#4ade80] transition-all"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">
+                      Classification
+                    </label>
+                    <select
+                      value={transactionForm.cat}
+                      onChange={(e) =>
+                        setTransactionForm({
+                          ...transactionForm,
+                          cat: e.target.value,
+                        })
+                      }
+                      className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-sm text-white outline-none focus:border-[#4ade80] transition-all appearance-none"
+                    >
+                      {[
+                        "Food",
+                        "Textbooks",
+                        "Housing",
+                        "Income",
+                        "Others",
+                        "Entertainment",
+                        "Transport",
+                      ].map((cat) => (
+                        <option key={cat} value={cat} className="bg-[#1a1a24]">
+                          {cat}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">
+                      Value ($USD)
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="0.00"
+                      value={transactionForm.amount}
+                      onChange={(e) =>
+                        setTransactionForm({
+                          ...transactionForm,
+                          amount: e.target.value,
+                        })
+                      }
+                      className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-sm text-white outline-none focus:border-[#4ade80] transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">
+                    Timestamp Node
+                  </label>
+                  <input
+                    type="date"
+                    value={transactionForm.date}
+                    onChange={(e) =>
+                      setTransactionForm({
+                        ...transactionForm,
+                        date: e.target.value,
+                      })
+                    }
+                    className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-sm text-white outline-none focus:border-[#4ade80] transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="p-8 border-t border-white/5 bg-black/20 flex gap-3">
+                {editingTransaction && (
+                  <button
+                    onClick={() => handleDeleteTransaction(editingTransaction.id)}
+                    className="p-4 bg-red-500/10 text-red-500 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all flex-1"
+                  >
+                    Delete
+                  </button>
+                )}
+                <button
+                  onClick={handleSaveTransaction}
+                  className="p-4 bg-[#4ade80] text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-xl shadow-[#4ade80]/20 hover:scale-[1.02] active:scale-95 transition-all flex-[2]"
+                >
+                  {editingTransaction ? "Sync Changes" : "Commit Log"}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   );

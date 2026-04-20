@@ -117,6 +117,36 @@ export async function processSyllabusHybrid(syllabusText: string) {
   }
 }
 
+export async function processStudyMaterials(materials: { type: 'text' | 'link' | 'file', content: string }[]) {
+  const prompt = `
+    As an AI Knowledge Architect, analyze these diverse study materials and synthesize them into a structured knowledge base.
+    
+    MATERIALS: 
+    ${materials.map((m, i) => `[Source ${i+1}, Type: ${m.type}]: ${m.content.substring(0, 2000)}`).join('\n\n')}
+    
+    OUTPUT REQUIREMENT:
+    Return a JSON object with:
+    - "notebook": { "title": string, "concepts": { "tag": string, "summary": string }[] }
+    - "mindMap": { "root": string, "nodes": { "id": string, "label": string, "connections": string[] }[] }
+    - "managerNote": string (A high-level summary of the integration)
+    
+    Ensure the mind map nodes are connected logically.
+    Return ONLY raw JSON.
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: { responseMimeType: "application/json" }
+    });
+    return JSON.parse(response.text || '{}');
+  } catch (error) {
+    console.error("Study Material Synthesis Error:", error);
+    return null;
+  }
+}
+
 export async function generateCreatorTemplate(notes: string, style: string) {
   const stylePrompts: Record<string, string> = {
     "Minimalist Productivity": "Calm, flowing language. Focus on peace of mind and frictionless systems. No bullets.",
@@ -151,23 +181,36 @@ export async function generateCreatorTemplate(notes: string, style: string) {
 
 export async function gradeFeynmanExplanation(explanation: string) {
   const prompt = `
-    Act as a strict but encouraging professor. The user is explaining a concept to a 5-year-old. 
-    If they use jargon, penalize them. Highlight areas where their logic breaks down.
+    Act as a strict but encouraging professor. The user is explaining a concept to a 5-year-old (Feynman Technique). 
+    Evaluate the explanation for Clarity (simplicity) and Accuracy (correctness).
     
     EXPLANATION: "${explanation}"
     
-    Provide your evaluation in a supportive but rigorous tone.
+    RETURN REQUIREMENT:
+    You MUST return a valid JSON object with:
+    - "clarityScore": (Number 1-10)
+    - "accuracyScore": (Number 1-10)
+    - "feedback": (String) Detailed evaluation highlighting logic gaps or jargon usage.
+    - "suggestions": (List of strings) Specific ways to simplify or correct the explanation.
+    
+    Return ONLY raw JSON.
   `;
 
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: prompt
+      contents: prompt,
+      config: { responseMimeType: "application/json" }
     });
-    return response.text;
+    return JSON.parse(response.text || '{}');
   } catch (error) {
     console.error("Feynman Error:", error);
-    return "The Professor is currently out of office. Check your connection.";
+    return {
+      clarityScore: 0,
+      accuracyScore: 0,
+      feedback: "The Professor is currently out of office. Check your connection.",
+      suggestions: []
+    };
   }
 }
 
@@ -191,6 +234,39 @@ export async function generateElaborativeQuestions(notes: string) {
   } catch (error) {
     console.error("Question Gen Error:", error);
     return [];
+  }
+}
+
+export async function synthesizeNeuralGraph(text: string, existingNodes: string[]) {
+  const prompt = `
+    As a specialized Data Scientist & Knowledge Engineer, perform semantic synthesis on the following text to create a Knowledge Graph.
+    
+    TEXT: ${text.substring(0, 4000)}
+    EXISTING_NOTEBOOK_TITLES: ${existingNodes.join(", ")}
+    
+    INGESTION PIPELINE REQUIRMENTS:
+    1. Extract "Nodes" (Key Concepts) and "Edges" (Relationships).
+    2. CROSS-LINKING: If an extracted node semantically matches an EXISTING_NOTEBOOK_TITLE, you MUST use that exact title as the node label.
+    3. SUMMARY: For each node, generate a concise summary.
+    4. WIKILINKS: Include Obsidian-style [[WikiLinks]] in the summaries if they reference other extracted or existing nodes.
+    
+    OUTPUT FORMAT (JSON ONLY):
+    {
+      "nodes": [{ "id": string, "label": string, "summary": string, "isExisting": boolean }],
+      "edges": [{ "source": string, "target": string, "type": string }]
+    }
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: { responseMimeType: "application/json" }
+    });
+    return JSON.parse(response.text || '{}');
+  } catch (error) {
+    console.error("Neural Graph Synthesis Error:", error);
+    return null;
   }
 }
 

@@ -18,7 +18,8 @@ import {
   Moon,
   Search,
   Bell,
-  FlaskConical
+  FlaskConical,
+  Network
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Section } from './types';
@@ -30,6 +31,7 @@ import ProductivityView from './components/ProductivityView';
 import FinanceView from './components/FinanceView';
 import NotesView from './components/NotesView';
 import KnowledgeLab from './components/KnowledgeLab';
+import KnowledgeGraphView from './components/KnowledgeGraphView';
 import SettingsView from './components/SettingsView';
 import OnboardingWizard from './components/OnboardingWizard';
 
@@ -105,6 +107,7 @@ export default function App() {
       items: [
         { id: 'notes', label: 'Knowledge Base', icon: StickyNote },
         { id: 'knowledge_lab', label: 'AI Knowledge Lab', icon: FlaskConical },
+        { id: 'knowledge_graph', label: 'Neural Graph', icon: Network },
       ]
     }
   ];
@@ -125,6 +128,7 @@ export default function App() {
       case 'finance': return <FinanceView />;
       case 'notes': return <NotesView />;
       case 'knowledge_lab': return <KnowledgeLab />;
+      case 'knowledge_graph': return <KnowledgeGraphView onOpenNotebook={(title) => setActiveSection('notes')} />;
       case 'settings': 
         return (
           <SettingsView 

@@ -34,13 +34,53 @@ interface CalendarEvent {
 export default function CalendarView() {
   const [mode, setMode] = useState<CalendarMode>('month');
   const [selectedDay, setSelectedDay] = useState<number | null>(19);
-  const [events, setEvents] = useState<CalendarEvent[]>([
-    { id: '1', day: 20, title: 'Biology Exam: Unit 2', type: 'academic', time: '10:00 AM', description: 'Major assessment on Cellular Respiration.' },
-    { id: '2', day: 15, title: 'History Essay Due', type: 'academic', time: '11:59 PM' },
-    { id: '3', day: 25, title: 'Lab Reflection', type: 'academic', time: '02:00 PM' },
-    { id: '4', day: 19, title: 'Yoga Session', type: 'wellness', time: '08:00 AM' },
-    { id: '5', day: 19, title: 'Deep Work: Math', type: 'academic', time: '02:00 PM' },
-  ]);
+  const [events, setEvents] = useState<CalendarEvent[]>(() => {
+    const saved = localStorage.getItem('calendar_events');
+    if (saved) return JSON.parse(saved);
+    return [
+      { id: '1', day: 20, title: 'Biology Exam: Unit 2', type: 'academic', time: '10:00 AM', description: 'Major assessment on Cellular Respiration.' },
+      { id: '2', day: 15, title: 'History Essay Due', type: 'academic', time: '11:59 PM' },
+      { id: '3', day: 25, title: 'Lab Reflection', type: 'academic', time: '02:00 PM' },
+      { id: '4', day: 19, title: 'Yoga Session', type: 'wellness', time: '08:00 AM' },
+      { id: '5', day: 19, title: 'Deep Work: Math', type: 'academic', time: '02:00 PM' },
+    ];
+  });
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<Partial<CalendarEvent> | null>(null);
+
+  React.useEffect(() => {
+    localStorage.setItem('calendar_events', JSON.stringify(events));
+  }, [events]);
+
+  const handleAddEvent = () => {
+    setEditingEvent({ day: selectedDay || 1, title: '', type: 'academic', time: '' });
+    setIsEditing(true);
+  };
+
+  const handleEditEvent = (event: CalendarEvent) => {
+    setEditingEvent(event);
+    setIsEditing(true);
+  };
+
+  const handleDeleteEvent = (id: string) => {
+    setEvents(prev => prev.filter(e => e.id !== id));
+  };
+
+  const handleSaveEvent = () => {
+    if (!editingEvent?.title) return;
+    if (editingEvent.id) {
+      setEvents(prev => prev.map(e => e.id === editingEvent.id ? (editingEvent as CalendarEvent) : e));
+    } else {
+      const newEvent: CalendarEvent = {
+        ...editingEvent as any,
+        id: Math.random().toString(36).substr(2, 9),
+      };
+      setEvents(prev => [...prev, newEvent]);
+    }
+    setIsEditing(false);
+    setEditingEvent(null);
+  };
 
   const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -93,11 +133,124 @@ export default function CalendarView() {
             <button className="px-8 py-2 text-sm font-bold border-r border-white/10 text-white whitespace-nowrap min-w-[140px]">April 2026</button>
             <button className="px-4 hover:bg-white/10 transition-colors text-white/60"><ChevronRight size={16} /></button>
           </div>
-          <button className="bg-[#9d81ff] h-12 text-white px-6 rounded-[6px] text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-[#9d81ff]/20">
+          <button 
+            onClick={handleAddEvent}
+            className="bg-[#9d81ff] h-12 text-white px-6 rounded-[6px] text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-[#9d81ff]/20"
+          >
             <Plus size={16} /> Incorporate Entry
           </button>
         </div>
       </div>
+
+      <AnimatePresence>
+        {isEditing && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              className="glass-card max-w-md w-full p-8 border-[#9d81ff]/20 shadow-2xl relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-[#9d81ff]/10 blur-3xl -mr-16 -mt-16" />
+              <div className="relative z-10 space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-black uppercase tracking-widest text-[#9d81ff]">
+                    {editingEvent?.id ? 'Adjust Entry' : 'Spawn Event'}
+                  </h3>
+                  <button onClick={() => setIsEditing(false)} className="text-white/20 hover:text-white">
+                    <Plus className="rotate-45" size={20} />
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-white/30">Intelligence Index (Title)</label>
+                    <input 
+                      type="text" 
+                      value={editingEvent?.title || ''}
+                      onChange={e => setEditingEvent(prev => ({ ...prev!, title: e.target.value }))}
+                      className="w-full bg-white/5 border border-white/10 rounded-[6px] p-3 text-sm text-white outline-none focus:border-[#9d81ff]"
+                      placeholder="e.g. Bio Exam 2"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-white/30">Temporal Marker (Day)</label>
+                      <input 
+                        type="number" 
+                        min="1" max="30"
+                        value={editingEvent?.day || ''}
+                        onChange={e => setEditingEvent(prev => ({ ...prev!, day: parseInt(e.target.value) }))}
+                        className="w-full bg-white/5 border border-white/10 rounded-[6px] p-3 text-sm text-white outline-none focus:border-[#9d81ff]"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-white/30">Stamp (Time)</label>
+                      <input 
+                        type="text" 
+                        value={editingEvent?.time || ''}
+                        onChange={e => setEditingEvent(prev => ({ ...prev!, time: e.target.value }))}
+                        className="w-full bg-white/5 border border-white/10 rounded-[6px] p-3 text-sm text-white outline-none focus:border-[#9d81ff]"
+                        placeholder="10:00 AM"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-white/30">Classification</label>
+                    <div className="flex gap-2">
+                      {['academic', 'wellness', 'social'].map(t => (
+                        <button 
+                          key={t}
+                          onClick={() => setEditingEvent(prev => ({ ...prev!, type: t as any }))}
+                          className={`flex-1 py-2 rounded-[6px] text-[10px] font-black uppercase tracking-widest border transition-all ${
+                            editingEvent?.type === t 
+                              ? 'bg-[#9d81ff]/20 border-[#9d81ff] text-[#9d81ff]' 
+                              : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'
+                          }`}
+                        >
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-white/30">Descriptive Metadata</label>
+                    <textarea 
+                      value={editingEvent?.description || ''}
+                      onChange={e => setEditingEvent(prev => ({ ...prev!, description: e.target.value }))}
+                      className="w-full bg-white/5 border border-white/10 rounded-[6px] p-3 text-sm text-white outline-none focus:border-[#9d81ff] h-24 resize-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  {editingEvent?.id && (
+                    <button 
+                      onClick={() => { handleDeleteEvent(editingEvent.id!); setIsEditing(false); }}
+                      className="flex-1 py-4 bg-red-500/10 text-red-500 border border-red-500/20 rounded-[6px] text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all shadow-xl shadow-red-500/10"
+                    >
+                      Delete Entry
+                    </button>
+                  )}
+                  <button 
+                    onClick={handleSaveEvent}
+                    className="flex-[2] py-4 bg-[#9d81ff] text-white rounded-[6px] text-[10px] font-black uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-[#9d81ff]/20"
+                  >
+                    Confirm Synchronization
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence mode="wait">
         <motion.div
@@ -109,7 +262,7 @@ export default function CalendarView() {
            className="w-full"
         >
           {mode === 'year' && <YearlyView events={events} />}
-          {mode === 'month' && <MonthlyView events={events} selectedDay={selectedDay} setSelectedDay={setSelectedDay} onExport={handleExportToOS} weekdays={weekdays} />}
+          {mode === 'month' && <MonthlyView events={events} selectedDay={selectedDay} setSelectedDay={setSelectedDay} onExport={handleExportToOS} onEdit={handleEditEvent} onAdd={handleAddEvent} weekdays={weekdays} />}
           {mode === 'week' && <WeeklyView events={events} weekdays={weekdays} />}
         </motion.div>
       </AnimatePresence>
@@ -187,7 +340,7 @@ function YearlyView({ events }: { events: CalendarEvent[] }) {
   );
 }
 
-function MonthlyView({ events, selectedDay, setSelectedDay, onExport, weekdays }: any) {
+function MonthlyView({ events, selectedDay, setSelectedDay, onExport, onEdit, onAdd, weekdays }: any) {
   const daysInMonth = Array.from({ length: 35 }, (_, i) => i - 3);
   const getEventsForDay = (day: number) => events.filter((e: any) => e.day === day);
 
@@ -276,12 +429,20 @@ function MonthlyView({ events, selectedDay, setSelectedDay, onExport, weekdays }
                               <Clock size={14} className="text-[#9d81ff]" />
                               <span className="text-[10px] font-bold text-white/40">{e.time || 'All Day'}</span>
                            </div>
-                           <button 
-                             onClick={() => onExport(e)}
-                             className="p-1 px-2 rounded-[4px] bg-[#9d81ff]/10 text-[#9d81ff] text-[8px] font-black hover:bg-[#9d81ff] hover:text-white transition-all opacity-0 group-hover:opacity-100 flex items-center gap-1"
-                           >
-                             <Share2 size={8} /> OS PUSH
-                           </button>
+                           <div className="flex gap-1">
+                             <button 
+                               onClick={() => onEdit(e)}
+                               className="p-1 px-2 rounded-[4px] bg-white/10 text-white/60 text-[8px] font-black hover:bg-white/20 transition-all opacity-0 group-hover:opacity-100"
+                             >
+                               EDIT
+                             </button>
+                             <button 
+                               onClick={() => onExport(e)}
+                               className="p-1 px-2 rounded-[4px] bg-[#9d81ff]/10 text-[#9d81ff] text-[8px] font-black hover:bg-[#9d81ff] hover:text-white transition-all opacity-0 group-hover:opacity-100 flex items-center gap-1"
+                             >
+                               <Share2 size={8} /> OS PUSH
+                             </button>
+                           </div>
                          </div>
                          <h4 className="font-bold text-sm text-white">{e.title}</h4>
                          <p className="text-[10px] text-white/30 font-medium line-clamp-2">{e.description || 'No additional intelligence data available.'}</p>
@@ -292,7 +453,10 @@ function MonthlyView({ events, selectedDay, setSelectedDay, onExport, weekdays }
                   )}
                 </div>
 
-                <button className="w-full py-4 bg-white/5 hover:bg-white/10 text-white rounded-[6px] font-bold text-sm flex items-center justify-center gap-2 transition-all border border-white/5">
+                <button 
+                  onClick={onAdd}
+                  className="w-full py-4 bg-white/5 hover:bg-white/10 text-white rounded-[6px] font-bold text-sm flex items-center justify-center gap-2 transition-all border border-white/5"
+                >
                   <Plus size={18} /> Spawn Entry
                 </button>
               </div>

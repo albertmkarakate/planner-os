@@ -85,94 +85,319 @@ export default function ProductivityView() {
 }
 
 function KanbanBoard() {
-  const [tasks, setTasks] = useState<Task[]>([
-    { id: '1', title: 'Biology Lab Report: Cellular Respiration', priority: 'High', tag: 'Biology 101', status: 'progress' },
-    { id: '2', title: 'Review History Lecture Slides (Week 4)', priority: 'Medium', tag: 'History of Art', status: 'todo' },
-    { id: '3', title: 'Math Problem Set: Calculus', priority: 'High', tag: 'Advanced Math', status: 'todo' },
-    { id: '4', title: 'Email Professor about Essay', priority: 'Low', tag: 'Notes', status: 'done' },
-  ]);
+  const [tasks, setTasks] = useState<Task[]>(() => {
+    const saved = localStorage.getItem("planner_tasks");
+    if (saved) return JSON.parse(saved);
+    return [
+      {
+        id: "1",
+        title: "Biology Lab Report: Cellular Respiration",
+        priority: "High",
+        tag: "Biology 101",
+        status: "progress",
+      },
+      {
+        id: "2",
+        title: "Review History Lecture Slides (Week 4)",
+        priority: "Medium",
+        tag: "History of Art",
+        status: "todo",
+      },
+      {
+        id: "3",
+        title: "Math Problem Set: Calculus",
+        priority: "High",
+        tag: "Advanced Math",
+        status: "todo",
+      },
+      {
+        id: "4",
+        title: "Email Professor about Essay",
+        priority: "Low",
+        tag: "Notes",
+        status: "done",
+      },
+    ];
+  });
+
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [taskForm, setTaskForm] = useState<Partial<Task>>({
+    title: "",
+    priority: "Medium",
+    tag: "General",
+    status: "todo",
+  });
+
+  useEffect(() => {
+    localStorage.setItem("planner_tasks", JSON.stringify(tasks));
+  }, [tasks]);
 
   const moveTask = (id: string, newStatus: TaskStatus) => {
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, status: newStatus } : t));
+    setTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, status: newStatus } : t)),
+    );
+  };
+
+  const openTaskModal = (task: Task | null = null, initialStatus: TaskStatus = "todo") => {
+    if (task) {
+      setEditingTask(task);
+      setTaskForm(task);
+    } else {
+      setEditingTask(null);
+      setTaskForm({ title: "", priority: "Medium", tag: "General", status: initialStatus });
+    }
+    setShowTaskModal(true);
+  };
+
+  const handleSaveTask = () => {
+    if (!taskForm.title?.trim()) return;
+    if (editingTask) {
+      setTasks((prev) =>
+        prev.map((t) => (t.id === editingTask.id ? ({ ...t, ...taskForm } as Task) : t)),
+      );
+    } else {
+      const newTask: Task = {
+        id: Date.now().toString(),
+        title: taskForm.title || "",
+        priority: taskForm.priority || "Medium",
+        tag: taskForm.tag || "General",
+        status: taskForm.status || "todo",
+      };
+      setTasks((prev) => [...prev, newTask]);
+    }
+    setShowTaskModal(false);
+  };
+
+  const handleDeleteTask = (id: string) => {
+    setTasks((prev) => prev.filter((t) => t.id !== id));
+    setShowTaskModal(false);
   };
 
   const columns: { id: TaskStatus; label: string; color: string }[] = [
-    { id: 'todo', label: 'To Do', color: '#white/20' },
-    { id: 'progress', label: 'In Progress', color: '#9d81ff' },
-    { id: 'done', label: 'Completed', color: '#4ade80' },
+    { id: "todo", label: "To Do", color: "#white/20" },
+    { id: "progress", label: "In Progress", color: "#9d81ff" },
+    { id: "done", label: "Completed", color: "#4ade80" },
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      {columns.map(col => (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
+      {columns.map((col) => (
         <div key={col.id} className="space-y-4">
           <div className="flex items-center justify-between px-2">
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: col.color === '#white/20' ? 'rgba(255,255,255,0.2)' : col.color }} />
-              <h3 className="text-xs font-black uppercase tracking-widest text-white/50">{col.label}</h3>
+              <div
+                className="w-2 h-2 rounded-full"
+                style={{
+                  backgroundColor:
+                    col.color === "#white/20"
+                      ? "rgba(255,255,255,0.2)"
+                      : col.color,
+                }}
+              />
+              <h3 className="text-xs font-black uppercase tracking-widest text-white/50">
+                {col.label}
+              </h3>
               <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-white/30 font-mono">
-                {tasks.filter(t => t.status === col.id).length}
+                {tasks.filter((t) => t.status === col.id).length}
               </span>
             </div>
-            <button className="text-white/20 hover:text-white transition-colors">
+            <button 
+              onClick={() => openTaskModal(null, col.id)}
+              className="text-white/20 hover:text-white transition-colors"
+            >
               <Plus size={16} />
             </button>
           </div>
 
           <div className="space-y-3 min-h-[400px] p-2 bg-white/[0.02] rounded-3xl border border-dashed border-white/5">
-            {tasks.filter(t => t.status === col.id).map(task => (
-              <motion.div 
-                layoutId={task.id}
-                key={task.id}
-                className="p-5 glass-card space-y-4 group cursor-grab active:cursor-grabbing hover:border-white/20 transition-all shadow-sm"
-              >
-                <div className="flex items-start justify-between">
-                  <span className={`text-[9px] font-black uppercase tracking-tighter px-2 py-0.5 rounded border ${
-                    task.priority === 'High' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                    task.priority === 'Medium' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                    'bg-white/10 text-white/40 border-white/20'
-                  }`}>
-                    {task.priority}
-                  </span>
-                  <button className="text-white/20 hover:text-white group-hover:block hidden">
-                    <MoreHorizontal size={14} />
-                  </button>
-                </div>
-                
-                <p className="text-sm font-bold text-white leading-tight">
-                  {task.title}
-                </p>
+            {tasks
+              .filter((t) => t.status === col.id)
+              .map((task) => (
+                <motion.div
+                  layoutId={task.id}
+                  key={task.id}
+                  className="p-5 glass-card space-y-4 group cursor-grab active:cursor-grabbing hover:border-white/20 transition-all shadow-sm"
+                >
+                  <div className="flex items-start justify-between">
+                    <span
+                      className={`text-[9px] font-black uppercase tracking-tighter px-2 py-0.5 rounded border ${
+                        task.priority === "High"
+                          ? "bg-red-500/10 text-red-400 border-red-500/20"
+                          : task.priority === "Medium"
+                            ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                            : "bg-white/10 text-white/40 border-white/20"
+                      }`}
+                    >
+                      {task.priority}
+                    </span>
+                    <button 
+                      onClick={() => openTaskModal(task)}
+                      className="text-white/20 hover:text-white group-hover:block hidden"
+                    >
+                      <MoreHorizontal size={14} />
+                    </button>
+                  </div>
 
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-[10px] font-medium text-white/30">
-                    <Star size={10} className="text-[#9d81ff]" />
-                    {task.tag}
+                  <p className="text-sm font-bold text-white leading-tight">
+                    {task.title}
+                  </p>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-[10px] font-medium text-white/30">
+                      <Star size={10} className="text-[#9d81ff]" />
+                      {task.tag}
+                    </div>
+
+                    <div className="flex gap-1">
+                      {col.id !== "todo" && (
+                        <button
+                          onClick={() =>
+                            moveTask(
+                              task.id,
+                              col.id === "done" ? "progress" : "todo",
+                            )
+                          }
+                          className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-white/30 hover:text-white transition-all"
+                        >
+                          <RotateCcw size={12} />
+                        </button>
+                      )}
+                      {col.id !== "done" && (
+                        <button
+                          onClick={() =>
+                            moveTask(
+                              task.id,
+                              col.id === "todo" ? "progress" : "done",
+                            )
+                          }
+                          className="p-1.5 bg-[#9d81ff]/20 hover:bg-[#9d81ff] rounded-lg text-[#9d81ff] hover:text-white transition-all"
+                        >
+                          <CheckCircle2 size={12} />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  
-                  <div className="flex gap-1">
-                    {col.id !== 'todo' && (
-                      <button 
-                        onClick={() => moveTask(task.id, col.id === 'done' ? 'progress' : 'todo')}
-                        className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-white/30 hover:text-white transition-all"
-                      >
-                         <RotateCcw size={12} />
-                      </button>
-                    )}
-                    {col.id !== 'done' && (
-                      <button 
-                         onClick={() => moveTask(task.id, col.id === 'todo' ? 'progress' : 'done')}
-                         className="p-1.5 bg-[#9d81ff]/20 hover:bg-[#9d81ff] rounded-lg text-[#9d81ff] hover:text-white transition-all"
-                      >
-                         <CheckCircle2 size={12} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              ))}
           </div>
         </div>
       ))}
+
+      <AnimatePresence>
+        {showTaskModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-md"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              className="w-full max-w-md bg-[#1a1a24] border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
+            >
+              <div className="p-6 border-b border-white/5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#9d81ff]/10 flex items-center justify-center text-[#9d81ff]">
+                    <ListTodo size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-white text-lg leading-none">
+                      {editingTask ? "Refactor Task" : "New Objective Node"}
+                    </h3>
+                    <p className="text-[10px] font-black uppercase text-white/30 tracking-widest mt-1">
+                      Productivity Registry
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowTaskModal(false)}
+                  className="p-2 hover:bg-white/5 rounded-lg transition-all text-white/40 hover:text-white"
+                >
+                  <Plus className="rotate-45" size={24} />
+                </button>
+              </div>
+
+              <div className="p-8 space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">
+                    Objective Label
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Finish Calculus p-set"
+                    value={taskForm.title}
+                    onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-sm text-white outline-none focus:border-[#9d81ff] transition-all"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">
+                      Priority Flux
+                    </label>
+                    <select
+                      value={taskForm.priority}
+                      onChange={(e) => setTaskForm({ ...taskForm, priority: e.target.value as any })}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-sm text-white outline-none focus:border-[#9d81ff] transition-all appearance-none"
+                    >
+                      <option value="High" className="bg-[#1a1a24]">High</option>
+                      <option value="Medium" className="bg-[#1a1a24]">Medium</option>
+                      <option value="Low" className="bg-[#1a1a24]">Low</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">
+                      Classification
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Biology"
+                      value={taskForm.tag}
+                      onChange={(e) => setTaskForm({ ...taskForm, tag: e.target.value })}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-sm text-white outline-none focus:border-[#9d81ff] transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">
+                      Execution State
+                    </label>
+                    <select
+                      value={taskForm.status}
+                      onChange={(e) => setTaskForm({ ...taskForm, status: e.target.value as any })}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-sm text-white outline-none focus:border-[#9d81ff] transition-all appearance-none"
+                    >
+                      <option value="todo" className="bg-[#1a1a24]">To Do</option>
+                      <option value="progress" className="bg-[#1a1a24]">In Progress</option>
+                      <option value="done" className="bg-[#1a1a24]">Completed</option>
+                    </select>
+                  </div>
+              </div>
+
+              <div className="p-8 border-t border-white/5 bg-black/20 flex gap-3">
+                {editingTask && (
+                  <button
+                    onClick={() => handleDeleteTask(editingTask.id)}
+                    className="p-4 bg-red-500/10 text-red-500 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all flex-1"
+                  >
+                    Terminate
+                  </button>
+                )}
+                <button
+                  onClick={handleSaveTask}
+                  className="p-4 bg-[#9d81ff] text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-xl shadow-[#9d81ff]/20 hover:scale-[1.02] active:scale-95 transition-all flex-[2]"
+                >
+                  {editingTask ? "Sync Changes" : "Commit Node"}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
