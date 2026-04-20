@@ -8,6 +8,7 @@ from PySide6.QtCore import Qt, QTimer, QTime
 from PySide6.QtGui import QColor, QIcon
 
 from cognitive_engine import CognitiveWorker, StudyDatabase
+from ai_tutor_chat import AITutorChatTab
 
 class NotebookEditorTab(QWidget):
     def __init__(self):
@@ -89,6 +90,10 @@ class NotebookEditorTab(QWidget):
         d_lay.addWidget(QLabel("AI Interrogation:"))
         d_lay.addWidget(self.question_list)
         self.tools_tabs.addTab(self.deep_tab, "Deep Dive")
+
+        # Tutor Chat
+        self.tutor_chat = AITutorChatTab(self.text_editor)
+        self.tools_tabs.addTab(self.tutor_chat, "💬 Tutor Chat")
 
         right_layout.addWidget(self.tools_tabs)
         main_splitter.addWidget(right_pane)

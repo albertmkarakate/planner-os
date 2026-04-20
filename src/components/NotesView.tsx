@@ -30,7 +30,7 @@ import {
 } from '../lib/gemini';
 
 type EditorMode = 'text' | 'dual';
-type ToolTab = 'recall' | 'feynman' | 'deepdive';
+type ToolTab = 'recall' | 'feynman' | 'deepdive' | 'chat';
 
 export default function NotesView() {
   const [notes, setNotes] = useState([
@@ -93,6 +93,31 @@ export default function NotesView() {
     const questions = await generateElaborativeQuestions(activeNote.content);
     setElaborativeQuestions(questions || []);
     setIsElaborateLoading(false);
+  };
+
+  // AI Tutor Chat Integration
+  const [chatMessages, setChatMessages] = useState<{sender: 'Me' | 'AI', text: string}[]>([]);
+  const [userInput, setUserInput] = useState('');
+  const [isChatLoading, setIsChatLoading] = useState(false);
+
+  const handleSendMessage = async (text?: string) => {
+    const msg = text || userInput;
+    if (!msg.trim()) return;
+    
+    setChatMessages(prev => [...prev, { sender: 'Me', text: msg }]);
+    if (!text) setUserInput('');
+    setIsChatLoading(true);
+
+    const prompt = `You are an expert, encouraging Socratic tutor. Here are the student's current notes: ${activeNote.content}. The student says: ${msg}. If they ask for an explanation, use analogies. DO NOT just give them the answers; ask guiding questions to test their understanding.`;
+    
+    try {
+      const response = await gradeFeynmanExplanation(prompt); 
+      setChatMessages(prev => [...prev, { sender: 'AI', text: response || "I'm having trouble connecting right now." }]);
+    } catch (err) {
+      console.error("Chat Error:", err);
+    } finally {
+      setIsChatLoading(false);
+    }
   };
 
   return (
@@ -238,6 +263,7 @@ export default function NotesView() {
                 { id: 'recall', icon: Zap },
                 { id: 'feynman', icon: GraduationCap },
                 { id: 'deepdive', icon: MessageSquare },
+                { id: 'chat', icon: Sparkles },
               ].map(tab => (
                 <button
                   key={tab.id}
@@ -298,7 +324,7 @@ export default function NotesView() {
                         onChange={(e) => setFeynmanInput(e.target.value)}
                       />
                       {feynmanAnalysis && (
-                        <div className="p-3 bg-[#9d81ff]/10 rounded-[6px] border border-[#9d81ff]/20 text-[10px] text-white/70 italic leading-relaxed">
+                        <div className="p-3 bg-[#9d81ff]/10 rounded-[6px] border border-[#9d81ff]/20 text-[10px] text-white/70 italic leading-relaxed max-h-32 overflow-y-auto">
                           {feynmanAnalysis}
                         </div>
                       )}
@@ -318,7 +344,7 @@ export default function NotesView() {
                          <span className="text-[9px] font-black text-white/30 uppercase tracking-widest">Interrogation Loop</span>
                          <Plus size={14} className="text-white/20" />
                       </div>
-                      <div className="space-y-2">
+                      <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                         {(elaborativeQuestions.length > 0 ? elaborativeQuestions : [
                           "Why does the Mitochondria produce ATP in this specific phase?",
                           "How does this relate to the metabolic goals of the organism?"
@@ -338,6 +364,71 @@ export default function NotesView() {
                       >
                         {isElaborateLoading ? "Synthesizing..." : "Synthesize New Questions"}
                       </button>
+                    </div>
+                  )}
+
+                  {activeTool === 'chat' && (
+                    <div className="flex flex-col h-full gap-4">
+                      <div className="flex-1 bg-black/20 rounded-[6px] border border-white/5 p-4 overflow-y-auto space-y-4 custom-scrollbar">
+                        {chatMessages.length === 0 && (
+                          <div className="text-center py-10 opacity-20">
+                            <MessageSquare className="mx-auto mb-2" size={32} />
+                            <p className="text-[10px] font-black uppercase tracking-widest">Tutor Context Ready</p>
+                          </div>
+                        )}
+                        {chatMessages.map((msg, i) => (
+                          <div key={i} className={`flex flex-col ${msg.sender === 'Me' ? 'items-end' : 'items-start'}`}>
+                            <span className={`text-[8px] font-black uppercase tracking-widest mb-1 ${msg.sender === 'Me' ? 'text-white/30' : 'text-[#9d81ff]'}`}>
+                              {msg.sender === 'Me' ? 'Student' : 'AI Tutor'}
+                            </span>
+                            <div className={`p-3 rounded-[6px] text-xs leading-relaxed ${
+                              msg.sender === 'Me' ? 'bg-[#9d81ff]/10 text-white/80 border border-[#9d81ff]/20' : 'bg-white/5 text-white/70 border border-white/10'
+                            }`}>
+                              {msg.text}
+                            </div>
+                          </div>
+                        ))}
+                        {isChatLoading && (
+                          <div className="flex gap-1 items-center px-1">
+                            <div className="w-1 h-1 bg-[#9d81ff] rounded-full animate-bounce" />
+                            <div className="w-1 h-1 bg-[#9d81ff] rounded-full animate-bounce delay-75" />
+                            <div className="w-1 h-1 bg-[#9d81ff] rounded-full animate-bounce delay-150" />
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <input 
+                          type="text"
+                          value={userInput}
+                          onChange={(e) => setUserInput(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                          placeholder="Ask your tutor..."
+                          className="flex-1 bg-white/5 border border-white/10 rounded-[6px] px-3 py-2 text-xs text-white outline-none focus:border-[#9d81ff] transition-colors"
+                        />
+                        <button 
+                          onClick={() => handleSendMessage()}
+                          disabled={isChatLoading}
+                          className="px-4 bg-[#9d81ff] text-white rounded-[6px] text-xs font-bold disabled:opacity-50"
+                        >
+                          Send
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <button 
+                          onClick={() => handleSendMessage("Please summarize the core concepts of my current notes and point out anything I seem to be missing.")}
+                          className="p-2 bg-white/5 border border-white/10 rounded-[6px] text-[8px] font-black uppercase tracking-widest text-white/40 hover:bg-white/10 transition-all text-left"
+                        >
+                          🧩 Explain Note
+                        </button>
+                        <button 
+                          onClick={() => handleSendMessage("I am stuck on the last concept I wrote down. Please break it down into smaller pieces.")}
+                          className="p-2 bg-white/5 border border-white/10 rounded-[6px] text-[8px] font-black uppercase tracking-widest text-white/40 hover:bg-white/10 transition-all text-left"
+                        >
+                          🆘 I'm Stuck
+                        </button>
+                      </div>
                     </div>
                   )}
                 </motion.div>

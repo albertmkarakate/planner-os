@@ -91,3 +91,39 @@ class StudyDatabase:
                     if by_subject[s]:
                         queue.append(by_subject[s].pop(0))
             return queue
+
+class ChatWorker(QThread):
+    chunk_received = Signal(str)
+    finished = Signal()
+    error = Signal(str)
+
+    def __init__(self, user_message, notebook_context):
+        super().__init__()
+        self.user_message = user_message
+        self.notebook_context = notebook_context
+
+    def run(self):
+        try:
+            # System Prompt Formulation as per Master Directive
+            system_prompt = (
+                "You are an expert, encouraging Socratic tutor. "
+                f"Here are the student's current notes: {self.notebook_context}. "
+                f"The student says: {self.user_message}. "
+                "If they ask for an explanation, use analogies. DO NOT just give them the answers; "
+                "ask guiding questions to test their understanding."
+            )
+            
+            # Simulating streaming response
+            import time
+            response_text = f"As your Socratic tutor, I see you've been working on: '{self.notebook_context[:30]}...'. "
+            response_text += "\nTo help you understand this deeper, let's think about it like this..."
+            response_text += "\nHave you considered how these concepts interlink with your previous lessons?"
+            
+            # Emit chunks to simulate typewriter effect
+            for chunk in response_text.split(" "):
+                self.chunk_received.emit(chunk + " ")
+                time.sleep(0.05) # simulate network/generation latency
+            
+            self.finished.emit()
+        except Exception as e:
+            self.error.emit(str(e))
