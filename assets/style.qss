@@ -1,0 +1,59 @@
+/* assets/style.qss */
+QWidget {
+    background-color: #1a1a24;
+    color: #ffffff;
+    font-family: 'Inter', sans-serif;
+}
+
+#ModernCard {
+    background-color: #1f1f2e;
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 12px;
+}
+
+QPushButton {
+    background-color: #2a2a3d;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-weight: 600;
+}
+
+QPushButton:hover {
+    background-color: #35354d;
+    border: 1px solid rgba(255,255,255,0.2);
+}
+
+QPushButton#PrimaryAction {
+    background-color: #9d81ff;
+    color: white;
+    border-radius: 8px;
+    padding: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+QLineEdit, QTextEdit {
+    background-color: #12121a;
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 6px;
+    padding: 10px;
+}
+
+QTabWidget::pane {
+    border: 1px solid rgba(255,255,255,0.05);
+    top: -1px;
+}
+
+QTabBar::tab {
+    background: #1a1a24;
+    padding: 12px 20px;
+    margin-right: 2px;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+}
+
+QTabBar::tab:selected {
+    background: #1f1f2e;
+    border-bottom: 2px solid #9d81ff;
+}

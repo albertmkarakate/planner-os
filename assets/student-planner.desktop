@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Student Planner OS
+Comment=AI-Powered Active Learning & Cognitive Lab
+Exec=student-planner
+Icon=icon
+Categories=Office;Education;Utility;
+Terminal=false
+StartupNotify=true

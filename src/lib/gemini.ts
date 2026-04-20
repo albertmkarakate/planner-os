@@ -193,3 +193,29 @@ export async function generateElaborativeQuestions(notes: string) {
     return [];
   }
 }
+
+export async function generateStudyGoals(className: string, syllabusContext?: string) {
+  const prompt = `
+    As an AI Academic Coach, generate 3-4 specific, actionable study goals for a student taking the course "${className}".
+    ${syllabusContext ? `Use the following syllabus/material context to make them hyper-relevant: ${syllabusContext}` : 'Focus on foundational concepts and general high-impact study tasks for this subject.'}
+    
+    Goals should be:
+    - Actionable (e.g., "Derive the formula for..." instead of "Learn math")
+    - Measurable
+    - Concise
+    
+    Return a JSON array of strings.
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: { responseMimeType: "application/json" }
+    });
+    return JSON.parse(response.text || '[]');
+  } catch (error) {
+    console.error("Study Goal Gen Error:", error);
+    return [];
+  }
+}

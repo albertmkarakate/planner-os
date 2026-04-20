@@ -1,0 +1,36 @@
+name: Build Linux AppImage
+on: 
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    # We use 20.04 to minimize GLIBC conflicts across older distros
+    runs-on: ubuntu-20.04
+    
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      
+      - name: 📦 Install Build Dependencies
+        run: |
+          pip install PySide6 nuitka pyqtdarktheme qtawesome ollama
+          sudo apt-get update
+          sudo apt-get install -y libfuse2 libegl1-mesa-dev qmake-qt5  # System libs for AppImage & Qt
+          
+      - name: 🏗️ Execute Release Script
+        run: bash build_appimage.sh
+        
+      - name: 🚀 Upload Release Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Student-Planner-AppImage
+          path: output/*.AppImage
+          retention-days: 7

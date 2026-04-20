@@ -11,9 +11,10 @@ import {
   ClipboardList,
   ChevronRight,
   MoreVertical,
-  Star
+  Star,
+  Sparkles
 } from 'lucide-react';
-import { processSyllabusHybrid } from '../lib/gemini';
+import { processSyllabusHybrid, generateStudyGoals } from '../lib/gemini';
 import { motion, AnimatePresence } from 'motion/react';
 import { EmptyState } from './ui/EmptyState';
 
@@ -28,6 +29,64 @@ export default function ClassesView() {
   const [activeTab, setActiveTab] = useState<'overview' | 'assignments' | 'notes'>('overview');
   const [isUploading, setIsUploading] = useState(false);
   const [ragResult, setRagResult] = useState<any>(null);
+
+  // Study Goals logic
+  const [studyGoals, setStudyGoals] = useState<Record<string, string[]>>(() => {
+    const saved = localStorage.getItem('studyGoals');
+    if (saved) return JSON.parse(saved);
+    return {
+      '1': ['Master mitosis vs meiosis', 'Review lab 3 results', 'Complete pre-lab reading'],
+      '2': ['Perfect chain rule derivation', 'Finish worksheet 4', 'Prepare for Friday quiz'],
+      '3': ['Read primary source on Baroque Art', 'Outline final essay'],
+    };
+  });
+
+  React.useEffect(() => {
+    localStorage.setItem('studyGoals', JSON.stringify(studyGoals));
+  }, [studyGoals]);
+
+  const [newGoalInput, setNewGoalInput] = useState('');
+  const [isAiGenerating, setIsAiGenerating] = useState(false);
+
+  const handleAiGenerateGoals = async () => {
+    setIsAiGenerating(true);
+    const goals = await generateStudyGoals(selectedClass.name, ragResult?.managerNote);
+    if (goals && goals.length > 0) {
+      setStudyGoals(prev => ({
+        ...prev,
+        [selectedClass.id]: [...(prev[selectedClass.id] || []), ...goals]
+      }));
+    }
+    setIsAiGenerating(false);
+  };
+
+  const handleAiSuggestSingleGoal = async () => {
+    setIsAiGenerating(true);
+    const context = ragResult ? JSON.stringify(ragResult) : undefined;
+    const goals = await generateStudyGoals(selectedClass.name, context);
+    if (goals && goals.length > 0) {
+      setNewGoalInput(goals[0]);
+    }
+    setIsAiGenerating(false);
+  };
+
+  const saveGoal = () => {
+    if (!newGoalInput.trim()) return;
+    setStudyGoals(prev => ({
+      ...prev,
+      [selectedClass.id]: [...(prev[selectedClass.id] || []), newGoalInput.trim()]
+    }));
+    setNewGoalInput('');
+  };
+
+  const removeGoal = (index: number) => {
+    setStudyGoals(prev => ({
+      ...prev,
+      [selectedClass.id]: prev[selectedClass.id].filter((_, i) => i !== index)
+    }));
+  };
+
+  const currentGoals = studyGoals[selectedClass.id] || [];
 
   const handleSyllabusUpload = async () => {
     setIsUploading(true);
@@ -134,52 +193,52 @@ export default function ClassesView() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* RAG Syllabus Reader Section */}
                 <div className="p-8 glass-card space-y-6 min-h-[500px] relative overflow-hidden">
-                  <div className="absolute top-0 left-0 w-2 h-full bg-[var(--color-accent)]/[0.2]" />
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 text-[var(--color-text-secondary)]">
-                      <FileText size={22} />
-                      <h3 className="text-xs font-black uppercase tracking-[0.2em]">Curriculum Extractor</h3>
-                    </div>
-                    <button 
-                      onClick={handleSyllabusUpload}
-                      disabled={isUploading}
-                      className="p-2.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-[6px] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-all shadow-sm"
-                    >
-                      {isUploading ? <div className="w-4 h-4 border-2 border-[var(--color-text-secondary)] border-t-[var(--color-accent)] rounded-full animate-spin" /> : <Plus size={18} />}
-                    </button>
-                  </div>
+                   <div className="absolute top-0 left-0 w-2 h-full bg-[var(--color-accent)]/[0.2]" />
+                   <div className="flex items-center justify-between">
+                     <div className="flex items-center gap-3 text-[var(--color-text-secondary)]">
+                       <FileText size={22} />
+                       <h3 className="text-xs font-black uppercase tracking-[0.2em]">Curriculum Extractor</h3>
+                     </div>
+                     <button 
+                       onClick={handleSyllabusUpload}
+                       disabled={isUploading}
+                       className="p-2.5 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-[6px] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-all shadow-sm"
+                     >
+                       {isUploading ? <div className="w-4 h-4 border-2 border-[var(--color-text-secondary)] border-t-[var(--color-accent)] rounded-full animate-spin" /> : <Plus size={18} />}
+                     </button>
+                   </div>
 
-                  {ragResult ? (
-                    <div className="space-y-8">
-                       <div className="p-5 bg-[var(--color-accent)]/[0.1] border border-[var(--color-accent)]/[0.2] rounded-2xl">
-                          <p className="text-[10px] font-black uppercase text-[var(--color-accent)] mb-2 tracking-widest">Architect's Summary</p>
-                          <p className="text-sm text-[var(--color-text-primary)] font-medium italic leading-relaxed">"{ragResult.managerNote}"</p>
-                       </div>
+                   {ragResult ? (
+                     <div className="space-y-8">
+                        <div className="p-5 bg-[var(--color-accent)]/[0.1] border border-[var(--color-accent)]/[0.2] rounded-2xl">
+                           <p className="text-[10px] font-black uppercase text-[var(--color-accent)] mb-2 tracking-widest">Architect's Summary</p>
+                           <p className="text-sm text-[var(--color-text-primary)] font-medium italic leading-relaxed">"{ragResult.managerNote}"</p>
+                        </div>
 
-                       <div className="space-y-4">
-                          <p className="text-[10px] font-black uppercase text-[var(--color-text-secondary)] tracking-widest">Crucial Deadlines</p>
-                          <div className="grid gap-3">
-                             {ragResult.keyDeadlines?.map((d: any, i: number) => (
-                               <div key={i} className="flex items-center justify-between p-4 bg-black/5 dark:bg-white/5 rounded-2xl border border-black/5 dark:border-white/5 group hover:bg-black/[0.08] dark:hover:bg-white/[0.08] transition-all">
-                                 <div className="flex items-center gap-3">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] shadow-[0_0_8px_var(--color-accent)]" />
-                                    <span className="text-sm font-bold text-[var(--color-text-primary)]">{d.title}</span>
-                                 </div>
-                                 <span className="text-[10px] font-mono bg-black/10 dark:bg-white/10 text-[var(--color-text-secondary)] px-2 py-1 rounded-lg border border-black/10 dark:border-white/10">{d.date}</span>
-                               </div>
-                             ))}
-                          </div>
-                       </div>
-                    </div>
-                  ) : (
-                    <EmptyState 
-                      icon={Upload}
-                      title="Curriculum Uncharted"
-                      description="Upload your module syllabus to initialize the RAG knowledge agent. The Architect AI will map your semester automatically."
-                      actionLabel="Ingest Syllabus"
-                      onAction={handleSyllabusUpload}
-                    />
-                  )}
+                        <div className="space-y-4">
+                           <p className="text-[10px] font-black uppercase text-[var(--color-text-secondary)] tracking-widest">Crucial Deadlines</p>
+                           <div className="grid gap-3">
+                              {ragResult.keyDeadlines?.map((d: any, i: number) => (
+                                <div key={i} className="flex items-center justify-between p-4 bg-black/5 dark:bg-white/5 rounded-2xl border border-black/5 dark:border-white/5 group hover:bg-black/[0.08] dark:hover:bg-white/[0.08] transition-all">
+                                  <div className="flex items-center gap-3">
+                                     <div className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] shadow-[0_0_8px_var(--color-accent)]" />
+                                     <span className="text-sm font-bold text-[var(--color-text-primary)]">{d.title}</span>
+                                  </div>
+                                  <span className="text-[10px] font-mono bg-black/10 dark:bg-white/10 text-[var(--color-text-secondary)] px-2 py-1 rounded-lg border border-black/10 dark:border-white/10">{d.date}</span>
+                                </div>
+                              ))}
+                           </div>
+                        </div>
+                     </div>
+                   ) : (
+                     <EmptyState 
+                       icon={Upload}
+                       title="Curriculum Uncharted"
+                       description="Upload your module syllabus to initialize the RAG knowledge agent. The Architect AI will map your semester automatically."
+                       actionLabel="Ingest Syllabus"
+                       onAction={handleSyllabusUpload}
+                     />
+                   )}
                 </div>
 
                 {/* AI Tutor & Files Pane */}
@@ -203,6 +262,70 @@ export default function ClassesView() {
                       </div>
                    </div>
 
+                   {/* Study Objectives & Micro-Quests */}
+                   <div className="p-8 glass-card space-y-6 text-[var(--color-text-primary)]">
+                      <div className="flex items-center justify-between">
+                         <h3 className="text-xs font-black uppercase tracking-widest text-[var(--color-text-secondary)]">Study Objectives</h3>
+                         <div className="flex items-center gap-3">
+                           <button 
+                             onClick={handleAiGenerateGoals}
+                             disabled={isAiGenerating}
+                             className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest border border-[var(--color-accent)]/[0.2] px-2.5 py-1 rounded-full text-[var(--color-accent)] hover:bg-[var(--color-accent)]/[0.05] transition-all disabled:opacity-50"
+                           >
+                             {isAiGenerating ? <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Sparkles size={12} />}
+                             AI Bulk
+                           </button>
+                           <span className="text-[10px] font-bold text-[var(--color-accent)]">{currentGoals.length} Active</span>
+                         </div>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        {currentGoals.map((goal, i) => (
+                           <div key={i} className="flex items-center justify-between p-4 bg-black/5 dark:bg-white/5 rounded-2xl border border-black/5 dark:border-white/5 group hover:border-[var(--color-accent)]/[0.3] transition-all">
+                              <div className="flex items-center gap-3">
+                                 <div className="w-5 h-5 rounded-md border border-[var(--color-accent)]/[0.3] flex items-center justify-center text-[var(--color-accent)] group-hover:bg-[var(--color-accent)] group-hover:text-white transition-all cursor-pointer">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-current" />
+                                 </div>
+                                 <span className="text-sm font-bold text-[var(--color-text-primary)]">{goal}</span>
+                              </div>
+                              <button 
+                                onClick={() => removeGoal(i)}
+                                className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500 transition-all font-bold"
+                              >
+                                <Plus size={14} className="rotate-45" />
+                              </button>
+                           </div>
+                        ))}
+                        
+                        <div className="flex gap-2 pt-2">
+                           <div className="flex-1 relative">
+                             <input 
+                                type="text" 
+                                value={newGoalInput}
+                                onChange={(e) => setNewGoalInput(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && saveGoal()}
+                                placeholder="Define milestone..."
+                                className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/5 rounded-[6px] px-4 py-2 pr-10 text-xs font-bold focus:border-[var(--color-accent)] transition-all outline-none"
+                             />
+                             <button 
+                               onClick={handleAiSuggestSingleGoal}
+                               disabled={isAiGenerating}
+                               className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-accent)] hover:scale-110 transition-all disabled:opacity-30"
+                               title="AI Suggest"
+                             >
+                               {isAiGenerating ? <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Sparkles size={14} />}
+                             </button>
+                           </div>
+                           <button 
+                              onClick={saveGoal}
+                              className="p-3 bg-[var(--color-accent)] text-white rounded-[6px] hover:opacity-90 transition-all font-bold"
+                           >
+                              <Plus size={16} />
+                           </button>
+                        </div>
+                      </div>
+                   </div>
+
                    <div className="p-8 glass-card space-y-6">
                       <div className="flex items-center justify-between">
                         <h3 className="text-xs font-black uppercase tracking-widest text-[var(--color-text-secondary)]">Module Repository</h3>
@@ -210,15 +333,15 @@ export default function ClassesView() {
                       </div>
                       <div className="space-y-4">
                         {['Lec_01_Basics.pdf', 'Lab_Guidelines.docx', 'Reference_List.epub'].map((f, i) => (
-                          <div key={i} className="flex items-center justify-between group cursor-pointer p-3 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-all">
-                             <div className="flex items-center gap-4">
-                               <div className="w-10 h-10 bg-black/5 dark:bg-white/5 rounded-xl flex items-center justify-center text-[var(--color-text-secondary)] opacity-50 group-hover:opacity-100 transition-all border border-black/5 dark:border-white/5">
-                                 <FileText size={20} />
-                               </div>
-                               <span className="text-sm font-bold text-[var(--color-text-secondary)] group-hover:text-[var(--color-text-primary)] transition-colors">{f}</span>
-                             </div>
-                             <Plus size={16} className="text-[var(--color-text-secondary)] opacity-10 group-hover:opacity-100 transition-all" />
-                          </div>
+                           <div key={i} className="flex items-center justify-between group cursor-pointer p-3 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-all">
+                              <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 bg-black/5 dark:bg-white/5 rounded-xl flex items-center justify-center text-[var(--color-text-secondary)] opacity-50 group-hover:opacity-100 transition-all border border-black/5 dark:border-white/5">
+                                  <FileText size={20} />
+                                </div>
+                                <span className="text-sm font-bold text-[var(--color-text-secondary)] group-hover:text-[var(--color-text-primary)] transition-colors">{f}</span>
+                              </div>
+                              <Plus size={16} className="text-[var(--color-text-secondary)] opacity-10 group-hover:opacity-100 transition-all" />
+                           </div>
                         ))}
                       </div>
                       <button className="w-full py-4 border-2 border-dashed border-black/5 dark:border-white/5 rounded-[6px] text-[var(--color-text-secondary)] opacity-30 text-xs font-black uppercase tracking-widest hover:opacity-100 transition-all">
