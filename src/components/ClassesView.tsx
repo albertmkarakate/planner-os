@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   Book,
   FileText,
@@ -21,6 +21,7 @@ import {
   Database,
   FilePlus,
   Settings2,
+  File as FileIcon,
 } from "lucide-react";
 import {
   processSyllabusHybrid,
@@ -98,8 +99,10 @@ export default function ClassesView({ learningMode }: ClassesViewProps) {
     { type: "text" | "link" | "file"; content: string; label: string }[]
   >([]);
   const [ingestInput, setIngestInput] = useState("");
-  const [ingestType, setIngestType] = useState<"text" | "link">("text");
+  const [ingestType, setIngestType] = useState<"text" | "link" | "file">("text");
   const [ingestLabel, setIngestLabel] = useState("");
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [showClassModal, setShowClassModal] = useState(false);
   const [editingClass, setEditingClass] = useState<any>(null);
@@ -155,26 +158,41 @@ export default function ClassesView({ learningMode }: ClassesViewProps) {
   };
 
   // Study Goals logic
-  const [studyGoals, setStudyGoals] = useState<Record<string, string[]>>(() => {
-    const saved = localStorage.getItem("studyGoals");
+  const [studyGoals, setStudyGoals] = useState<Record<string, { text: string; completed: boolean }[]>>(() => {
+    const saved = localStorage.getItem("studyGoals_v2");
     if (saved) return JSON.parse(saved);
+    
+    // Legacy migration or default
+    const legacySaved = localStorage.getItem("studyGoals");
+    if (legacySaved) {
+      const legacy = JSON.parse(legacySaved);
+      const mig: Record<string, { text: string; completed: boolean }[]> = {};
+      Object.keys(legacy).forEach(key => {
+        mig[key] = legacy[key].map((t: string) => ({ text: t, completed: false }));
+      });
+      return mig;
+    }
+
     return {
       "1": [
-        "Master mitosis vs meiosis",
-        "Review lab 3 results",
-        "Complete pre-lab reading",
+        { text: "Master mitosis vs meiosis", completed: false },
+        { text: "Review lab 3 results", completed: true },
+        { text: "Complete pre-lab reading", completed: false },
       ],
       "2": [
-        "Perfect chain rule derivation",
-        "Finish worksheet 4",
-        "Prepare for Friday quiz",
+        { text: "Perfect chain rule derivation", completed: false },
+        { text: "Finish worksheet 4", completed: false },
+        { text: "Prepare for Friday quiz", completed: false },
       ],
-      "3": ["Read primary source on Baroque Art", "Outline final essay"],
+      "3": [
+        { text: "Read primary source on Baroque Art", completed: false },
+        { text: "Outline final essay", completed: false }
+      ],
     };
   });
 
   React.useEffect(() => {
-    localStorage.setItem("studyGoals", JSON.stringify(studyGoals));
+    localStorage.setItem("studyGoals_v2", JSON.stringify(studyGoals));
   }, [studyGoals]);
 
   const [newGoalInput, setNewGoalInput] = useState("");
@@ -190,7 +208,10 @@ export default function ClassesView({ learningMode }: ClassesViewProps) {
     if (goals && goals.length > 0) {
       setStudyGoals((prev) => ({
         ...prev,
-        [selectedClass.id]: [...(prev[selectedClass.id] || []), ...goals],
+        [selectedClass.id]: [
+          ...(prev[selectedClass.id] || []),
+          ...goals.map(g => ({ text: g, completed: false }))
+        ],
       }));
     }
     setIsAiGenerating(false);
@@ -212,7 +233,7 @@ export default function ClassesView({ learningMode }: ClassesViewProps) {
       setStudyGoals((prev) => ({
         ...prev,
         [selectedClass.id]: prev[selectedClass.id].map((g, i) =>
-          i === editingGoalIndex ? newGoalInput.trim() : g,
+          i === editingGoalIndex ? { ...g, text: newGoalInput.trim() } : g,
         ),
       }));
       setEditingGoalIndex(null);
@@ -221,16 +242,25 @@ export default function ClassesView({ learningMode }: ClassesViewProps) {
         ...prev,
         [selectedClass.id]: [
           ...(prev[selectedClass.id] || []),
-          newGoalInput.trim(),
+          { text: newGoalInput.trim(), completed: false },
         ],
       }));
     }
     setNewGoalInput("");
   };
 
+  const toggleGoal = (index: number) => {
+    setStudyGoals((prev) => ({
+      ...prev,
+      [selectedClass.id]: prev[selectedClass.id].map((g, i) =>
+        i === index ? { ...g, completed: !g.completed } : g,
+      ),
+    }));
+  };
+
   const startEditingGoal = (index: number) => {
     setEditingGoalIndex(index);
-    setNewGoalInput(studyGoals[selectedClass.id][index]);
+    setNewGoalInput(studyGoals[selectedClass.id][index].text);
   };
 
   const removeGoal = (index: number) => {
@@ -241,6 +271,8 @@ export default function ClassesView({ learningMode }: ClassesViewProps) {
   };
 
   const currentGoals = studyGoals[selectedClass.id] || [];
+  const completedCount = currentGoals.filter(g => g.completed).length;
+  const progressPercent = currentGoals.length > 0 ? (completedCount / currentGoals.length) * 100 : 0;
 
   const handleSyllabusUpload = async () => {
     setIsUploading(true);
@@ -253,18 +285,44 @@ export default function ClassesView({ learningMode }: ClassesViewProps) {
   };
 
   const addToQueue = () => {
-    if (!ingestInput.trim()) return;
+    if (ingestType !== "file" && !ingestInput.trim()) return;
+    
     setIngestionQueue((prev) => [
       ...prev,
       {
         type: ingestType,
         content: ingestInput,
         label:
-          ingestLabel || (ingestType === "link" ? ingestInput : "Text Snippet"),
+          ingestLabel || (ingestType === "link" ? ingestInput : ingestType === "file" ? "Uploaded Asset" : "Text Snippet"),
       },
     ]);
     setIngestInput("");
     setIngestLabel("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleFileSelect = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    setIngestType("file");
+    setIngestLabel(file.name);
+    // In a real app we'd extract text, here we simulate content
+    setIngestInput(`[BINARY_ASSET_METADATA]: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`);
+  };
+
+  const onDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const onDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    handleFileSelect(e.dataTransfer.files);
   };
 
   const removeFromQueue = (idx: number) => {
@@ -607,12 +665,25 @@ export default function ClassesView({ learningMode }: ClassesViewProps) {
                     </div>
                   </div>
 
-                  {/* Study Objectives & Micro-Quests */}
-                  <div className="p-8 glass-card space-y-6 text-[var(--color-text-primary)]">
+                  {/* Study Objectives & Manual Input Section */}
+                  <div className="p-8 glass-card space-y-6 text-[var(--color-text-primary)] shadow-xl border-white/10">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-xs font-black uppercase tracking-widest text-[var(--color-text-secondary)]">
-                        Study Objectives
-                      </h3>
+                      <div className="space-y-1">
+                        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[var(--color-text-secondary)]">
+                          Study Goals Matrix
+                        </h3>
+                        {currentGoals.length > 0 && (
+                          <div className="flex items-center gap-2">
+                             <div className="h-1 w-24 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden">
+                               <div 
+                                 className="h-full bg-[var(--color-accent)] transition-all duration-500" 
+                                 style={{ width: `${progressPercent}%` }}
+                               />
+                             </div>
+                             <span className="text-[9px] font-black text-[var(--color-accent)] uppercase">{completedCount}/{currentGoals.length} MET</span>
+                          </div>
+                        )}
+                      </div>
                       <div className="flex items-center gap-3">
                         <button
                           onClick={handleAiGenerateGoals}
@@ -624,11 +695,8 @@ export default function ClassesView({ learningMode }: ClassesViewProps) {
                           ) : (
                             <Sparkles size={12} />
                           )}
-                          AI Bulk
+                          AI Bulk Synthesis
                         </button>
-                        <span className="text-[10px] font-bold text-[var(--color-accent)]">
-                          {currentGoals.length} Active
-                        </span>
                       </div>
                     </div>
 
@@ -636,20 +704,30 @@ export default function ClassesView({ learningMode }: ClassesViewProps) {
                       {currentGoals.map((goal, i) => (
                         <div
                           key={i}
-                          className={`flex items-center justify-between p-4 bg-black/5 dark:bg-white/5 rounded-2xl border transition-all group ${editingGoalIndex === i ? "border-[var(--color-accent)]" : "border-black/5 dark:border-white/5 hover:border-[var(--color-accent)]/[0.3]"}`}
+                          className={`flex items-center justify-between p-4 bg-black/5 dark:bg-white/5 rounded-2xl border transition-all group ${editingGoalIndex === i ? "border-[var(--color-accent)]" : "border-black/5 dark:border-white/5 hover:border-[var(--color-accent)]/[0.3]"} ${goal.completed ? "opacity-60" : ""}`}
                         >
                           <div
                             className="flex items-center gap-3 flex-1 cursor-pointer"
-                            onClick={() => startEditingGoal(i)}
+                            onClick={() => toggleGoal(i)}
                           >
-                            <div className="w-5 h-5 rounded-md border border-[var(--color-accent)]/[0.3] flex items-center justify-center text-[var(--color-accent)] group-hover:bg-[var(--color-accent)] group-hover:text-white transition-all">
-                              <div className="w-1.5 h-1.5 rounded-full bg-current" />
+                            <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${goal.completed ? "bg-green-500 border-green-500 text-white" : "border-[var(--color-accent)]/[0.3] text-[var(--color-accent)] group-hover:bg-[var(--color-accent)]/[0.1]"}`}>
+                              {goal.completed ? (
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                              ) : (
+                                <div className="w-1.5 h-1.5 rounded-full bg-current" />
+                              )}
                             </div>
-                            <span className="text-sm font-bold text-[var(--color-text-primary)]">
-                              {goal}
+                            <span className={`text-sm font-bold text-[var(--color-text-primary)] ${goal.completed ? "line-through opacity-50" : ""}`}>
+                              {goal.text}
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => startEditingGoal(i)}
+                              className="opacity-0 group-hover:opacity-100 p-1 text-white/20 hover:text-white transition-all"
+                            >
+                              <Settings2 size={12} />
+                            </button>
                             <button
                               onClick={() => removeGoal(i)}
                               className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500 transition-all font-bold"
@@ -660,35 +738,39 @@ export default function ClassesView({ learningMode }: ClassesViewProps) {
                         </div>
                       ))}
 
-                      <div className="flex gap-2 pt-2">
-                        <div className="flex-1 relative">
-                          <input
-                            type="text"
-                            value={newGoalInput}
-                            onChange={(e) => setNewGoalInput(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && saveGoal()}
-                            placeholder="Define milestone..."
-                            className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/5 rounded-[6px] px-4 py-2 pr-10 text-xs font-bold focus:border-[var(--color-accent)] transition-all outline-none"
-                          />
+                      {/* Manual Goal Entry Section */}
+                      <div className="space-y-2 mt-6">
+                        <label className="text-[9px] font-black uppercase text-white/20 tracking-widest ml-1">Manual Goal Entry</label>
+                        <div className="flex gap-2">
+                          <div className="flex-1 relative">
+                            <input
+                              type="text"
+                              value={newGoalInput}
+                              onChange={(e) => setNewGoalInput(e.target.value)}
+                              onKeyDown={(e) => e.key === "Enter" && saveGoal()}
+                              placeholder="Define a new study milestone..."
+                              className="w-full bg-black/10 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3.5 pr-10 text-xs font-bold focus:border-[var(--color-accent)] transition-all outline-none"
+                            />
+                            <button
+                              onClick={handleAiSuggestSingleGoal}
+                              disabled={isAiGenerating}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-accent)] hover:rotate-12 transition-all disabled:opacity-30"
+                              title="Suggest Goal with AI"
+                            >
+                              {isAiGenerating ? (
+                                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <Sparkles size={16} />
+                              )}
+                            </button>
+                          </div>
                           <button
-                            onClick={handleAiSuggestSingleGoal}
-                            disabled={isAiGenerating}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-accent)] hover:scale-110 transition-all disabled:opacity-30"
-                            title="AI Suggest"
+                            onClick={saveGoal}
+                            className="p-3.5 bg-[var(--color-accent)] text-white rounded-xl hover:opacity-90 transition-all font-bold shadow-lg shadow-[var(--color-accent)]/20"
                           >
-                            {isAiGenerating ? (
-                              <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                            ) : (
-                              <Sparkles size={14} />
-                            )}
+                            <Plus size={18} />
                           </button>
                         </div>
-                        <button
-                          onClick={saveGoal}
-                          className="p-3 bg-[var(--color-accent)] text-white rounded-[6px] hover:opacity-90 transition-all font-bold"
-                        >
-                          <Plus size={16} />
-                        </button>
                       </div>
                     </div>
                   </div>
@@ -1118,7 +1200,7 @@ export default function ClassesView({ learningMode }: ClassesViewProps) {
                   {[
                     { id: "text", label: "Manual Transcript", icon: FileText },
                     { id: "link", label: "Web/External Link", icon: Globe },
-                    { id: "file", label: "Local PDF/Asset", icon: Plus },
+                    { id: "file", label: "Local PDF/Asset", icon: Upload },
                   ].map((type) => (
                     <button
                       key={type.id}
@@ -1153,19 +1235,55 @@ export default function ClassesView({ learningMode }: ClassesViewProps) {
                     <label className="text-[10px] font-black uppercase text-white/30 tracking-widest">
                       Payload Data
                     </label>
-                    <textarea
-                      placeholder={
-                        ingestType === "link"
-                          ? "Paste HTTPS resource URL here..."
-                          : "Paste raw transcript or notes here..."
-                      }
-                      value={ingestInput}
-                      onChange={(e) => setIngestInput(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-sm text-white outline-none focus:border-[var(--color-accent)] transition-all h-32 resize-none"
-                    />
+                    
+                    {ingestType === "file" ? (
+                      <div 
+                        onDragOver={onDragOver}
+                        onDragLeave={onDragLeave}
+                        onDrop={onDrop}
+                        onClick={() => fileInputRef.current?.click()}
+                        className={`w-full h-32 border-2 border-dashed rounded-xl flex flex-col items-center justify-center gap-3 cursor-pointer transition-all ${
+                          isDragging 
+                            ? "bg-[var(--color-accent)]/10 border-[var(--color-accent)]" 
+                            : "bg-white/5 border-white/10 hover:bg-white/10"
+                        }`}
+                      >
+                        <input 
+                          type="file"
+                          ref={fileInputRef}
+                          onChange={(e) => handleFileSelect(e.target.files)}
+                          className="hidden"
+                          accept=".pdf,.docx,.txt,.csv,.epub"
+                        />
+                        <div className={`p-3 rounded-full ${ingestLabel ? "bg-green-500/20 text-green-500" : "bg-white/10 text-white/40"}`}>
+                          <Upload size={24} className={isDragging ? "animate-bounce" : ""} />
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs font-bold text-white">
+                            {ingestLabel || "Drop PDF or local assets here"}
+                          </p>
+                          <p className="text-[10px] text-white/30 uppercase font-black tracking-widest mt-1">
+                            {ingestLabel ? "Click to change file" : "or click to browse filesystem"}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <textarea
+                        placeholder={
+                          ingestType === "link"
+                            ? "Paste HTTPS resource URL here..."
+                            : "Paste raw transcript or notes here..."
+                        }
+                        value={ingestInput}
+                        onChange={(e) => setIngestInput(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-sm text-white outline-none focus:border-[var(--color-accent)] transition-all h-32 resize-none"
+                      />
+                    )}
+                    
                     <button
                       onClick={addToQueue}
-                      className="w-full py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[10px] font-black uppercase tracking-widest border border-white/10 transition-all"
+                      disabled={ingestType === "file" && !ingestLabel}
+                      className="w-full py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[10px] font-black uppercase tracking-widest border border-white/10 transition-all disabled:opacity-30"
                     >
                       Add to Ingestion Queue
                     </button>
@@ -1191,6 +1309,8 @@ export default function ClassesView({ learningMode }: ClassesViewProps) {
                           <div className="flex items-center gap-3">
                             {item.type === "link" ? (
                               <LinkIcon size={14} className="text-blue-400" />
+                            ) : item.type === "file" ? (
+                              <FileIcon size={14} className="text-green-400" />
                             ) : (
                               <FileText size={14} className="text-[#9d81ff]" />
                             )}

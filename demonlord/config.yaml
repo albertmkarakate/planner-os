@@ -1,0 +1,50 @@
+# Demon Lord OS Configuration
+
+system:
+  log_level: INFO
+  memory_dir: ~/.demonlord
+  priority: 1
+  auto_restart_failed_agents: true
+
+models:
+  paths:
+    ollama: /usr/bin/ollama
+    llama_cpp: /usr/local/bin/llama-server
+  defaults:
+    fast: "phi3"
+    standard: "mistral"
+    heavy: "qwen2.5:14b"
+    code: "deepseek-coder:6.7b"
+  vram_threshold_mb: 9000
+  ram_threshold_mb: 16000
+  code_vram_threshold_mb: 6000
+
+autonomy:
+  watched_directories:
+    - path: /tmp
+      pattern: "*.log"
+    - path: ~/demonlord_inbox
+      pattern: "*"
+  check_interval_seconds: 10
+  priority: 3
+
+agents:
+  supreme:
+    priority: 10
+    enable_auto_delegation: true
+  reasoning:
+    priority: 8
+    max_steps: 10
+  system:
+    priority: 5
+    gui_control_enabled: true
+  code:
+    priority: 5
+    safe_working_dir: ~/demonlord_workspace
+    allow_pip_install: true
+  memory:
+    priority: 4
+    vector_search_enabled: true
+  model:
+    priority: 4
+    allow_fallback: true

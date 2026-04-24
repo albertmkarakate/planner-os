@@ -6,8 +6,10 @@ export type Section =
   | 'productivity'
   | 'finance'
   | 'notes'
+  | 'demon_lord'
   | 'knowledge_lab'
   | 'knowledge_graph'
+  | 'classroom'
   | 'settings';
 
 export interface StudyGoal {

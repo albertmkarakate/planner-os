@@ -13,10 +13,15 @@ import {
   Zap,
   Save,
   Palette,
+  Mic,
+  MicOff,
+  Volume2,
+  Ear,
   Plus,
   Route,
   Layers,
-  BookOpen
+  BookOpen,
+  ShieldAlert
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -51,6 +56,7 @@ export default function SettingsView({
     { id: 'ai', label: 'AI & Models', icon: Bot },
     { id: 'appearance', label: 'Appearance', icon: Palette },
     { id: 'tasks', label: 'Active Tasks', icon: Activity },
+    { id: 'voice', label: 'Voice & Audio', icon: Mic },
     { id: 'profile', label: 'Learning Profile', icon: Brain },
     { id: 'privacy', label: 'Privacy & Data', icon: Lock }
   ] as const;
@@ -111,6 +117,7 @@ export default function SettingsView({
               className="glass-card p-8 h-full space-y-8"
             >
               {activeTab === 'ai' && <AIConfigTab />}
+              {activeTab === 'voice' && <VoiceTab />}
               {activeTab === 'appearance' && (
                 <AppearanceTab 
                   accentColor={accentColor} 
@@ -252,6 +259,67 @@ function AIConfigTab() {
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function VoiceTab() {
+  const [openMic, setOpenMic] = useState(false);
+  const [voiceActivation, setVoiceActivation] = useState(true);
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-500">
+       <div className="space-y-4">
+        <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-[var(--color-text-primary)]/30">
+          <Mic size={14} /> Voice Command Configuration
+        </h3>
+        
+        <div className="p-6 bg-white/5 rounded-2xl border border-white/10 space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <p className="text-sm font-bold text-white">Open Mic (Continuous Listening)</p>
+              <p className="text-[10px] text-white/30 uppercase tracking-widest font-black">Requires background permission</p>
+            </div>
+            <button 
+              onClick={() => setOpenMic(!openMic)}
+              className={`w-14 h-8 rounded-full relative transition-all duration-300 ${openMic ? 'bg-[var(--color-accent)]' : 'bg-white/10'}`}
+            >
+              <div className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-xl transition-all duration-300 ${openMic ? 'left-7' : 'left-1'}`} />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between pt-4 border-t border-white/5">
+            <div className="space-y-1">
+              <p className="text-sm font-bold text-white">Voice Activation Keyword</p>
+              <p className="text-[10px] text-white/30 italic uppercase tracking-wider font-bold">"Hey Demon Lord..."</p>
+            </div>
+            <button 
+              onClick={() => setVoiceActivation(!voiceActivation)}
+              className={`w-14 h-8 rounded-full relative transition-all duration-300 ${voiceActivation ? 'bg-[var(--color-accent)]' : 'bg-white/10'}`}
+            >
+              <div className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-xl transition-all duration-300 ${voiceActivation ? 'left-7' : 'left-1'}`} />
+            </button>
+          </div>
+        </div>
+
+        <div className="grid gap-6">
+           <div className="space-y-2">
+            <label className="text-xs font-bold text-white/30 ml-1 uppercase tracking-widest">Input Sensitivity</label>
+            <div className="flex items-center gap-4">
+              <Ear size={14} className="text-white/20" />
+              <input type="range" className="flex-1 accent-[var(--color-accent)]" />
+              <Volume2 size={14} className="text-[var(--color-accent)]" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4 rounded-xl bg-[var(--color-accent)]/5 border border-[var(--color-accent)]/10 flex gap-4 items-start">
+        <ShieldAlert size={18} className="text-[var(--color-accent)] shrink-0" />
+        <p className="text-[10px] text-[var(--color-text-secondary)] leading-tight italic">
+          Continuous listening (Open Mic) modes may increase battery consumption and data usage if cloud-based STT engines are prioritized. Local processing is recommended for privacy.
+        </p>
       </div>
     </div>
   );

@@ -12,6 +12,7 @@ import {
   X,
   Plus,
   AlertCircle,
+  ShieldAlert,
   BrainCircuit,
   Settings,
   Route,
@@ -22,6 +23,7 @@ import {
   Search as SearchIcon,
   Bell,
   FlaskConical,
+  GraduationCap,
   Network
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -33,6 +35,8 @@ import WellnessView from './components/WellnessView';
 import ProductivityView from './components/ProductivityView';
 import FinanceView from './components/FinanceView';
 import NotesView from './components/NotesView';
+import DemonLordView from './components/DemonLordView';
+import ClassroomView from './components/ClassroomView';
 import KnowledgeLab from './components/KnowledgeLab';
 import KnowledgeGraphView from './components/KnowledgeGraphView';
 import SettingsView from './components/SettingsView';
@@ -133,15 +137,16 @@ export default function App() {
     {
       label: 'Strategy',
       items: [
+        { id: 'classroom', label: 'AI Virtual Classroom', icon: GraduationCap },
         { id: 'wellness', label: 'Wellness Matrix', icon: HeartPulse },
         { id: 'productivity', label: 'Productivity OS', icon: TrendingUp },
         { id: 'finance', label: 'Financial Matrix', icon: Wallet },
       ]
     },
     {
-      label: 'Knowledge',
+      label: 'Nexus Command',
       items: [
-        { id: 'notes', label: 'Knowledge Base', icon: StickyNote },
+        { id: 'demon_lord', label: 'Demon Lord OS', icon: ShieldAlert },
         { id: 'knowledge_lab', label: 'AI Knowledge Lab', icon: FlaskConical },
         { id: 'knowledge_graph', label: 'Neural Graph', icon: Network },
       ]
@@ -163,6 +168,8 @@ export default function App() {
       case 'productivity': return <ProductivityView />;
       case 'finance': return <FinanceView />;
       case 'notes': return <NotesView />;
+      case 'demon_lord': return <DemonLordView />;
+      case 'classroom': return <ClassroomView />;
       case 'knowledge_lab': return <KnowledgeLab />;
       case 'knowledge_graph': return <KnowledgeGraphView onOpenNotebook={(title) => setActiveSection('notes')} />;
       case 'settings': 
@@ -234,15 +241,20 @@ export default function App() {
           {navGroups.map((group, groupIdx) => (
             <div key={groupIdx} className="space-y-1">
               {group.label && isSidebarOpen && (
-                <button 
+                <motion.button 
+                  whileHover={{ x: 2 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={() => toggleGroup(group.label!)}
-                  className="w-full flex items-center justify-between text-[10px] font-black uppercase tracking-[0.2em] text-[var(--color-text-secondary)] opacity-50 px-3 py-2 hover:opacity-100 transition-opacity"
+                  className="w-full flex items-center justify-between text-[10px] font-black uppercase tracking-[0.2em] text-[var(--color-text-secondary)] opacity-50 px-3 py-2 hover:opacity-100 transition-all group/header"
                 >
                   {group.label}
-                  <motion.div animate={{ rotate: collapsedGroups[group.label!] ? -90 : 0 }}>
-                    <ChevronRight size={10} />
+                  <motion.div 
+                    animate={{ rotate: collapsedGroups[group.label!] ? -90 : 0 }}
+                    transition={{ duration: 0.2, ease: "circOut" }}
+                  >
+                    <ChevronRight size={10} className="group-hover/header:translate-x-0.5 transition-transform" />
                   </motion.div>
-                </button>
+                </motion.button>
               )}
               
               <AnimatePresence initial={false}>
@@ -251,26 +263,33 @@ export default function App() {
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
                     className="overflow-hidden space-y-1"
                   >
                     {group.items.map((item) => (
-                      <button
+                      <motion.button
                         key={item.id}
+                        whileHover={{ x: isSidebarOpen ? 4 : 0 }}
+                        whileTap={{ scale: 0.98 }}
                         onClick={() => setActiveSection(item.id)}
-                        className={`w-full flex items-center gap-3 p-3 transition-all group rounded-[6px] ${
+                        className={`w-full flex items-center gap-3 p-3 transition-all group rounded-[6px] relative ${
                           activeSection === item.id 
                             ? 'nav-item-active shadow-lg shadow-[var(--color-accent)]/10' 
                             : 'hover:bg-black/5 dark:hover:bg-white/5 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
                         }`}
                       >
-                        <item.icon className="w-5 h-5 flex-shrink-0" />
+                        <item.icon className={`w-5 h-5 flex-shrink-0 transition-transform group-hover:scale-110 ${activeSection === item.id ? 'scale-110' : ''}`} />
                         {isSidebarOpen && (
                           <span className="font-bold text-[13px] flex-1 text-left tracking-tight">{item.label}</span>
                         )}
                         {isSidebarOpen && activeSection === item.id && (
-                          <motion.div layoutId="active-indicator" className="w-1 h-4 bg-white rounded-full" />
+                          <motion.div 
+                            layoutId="active-indicator" 
+                            className="w-1 h-4 bg-white rounded-full absolute right-3" 
+                            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                          />
                         )}
-                      </button>
+                      </motion.button>
                     ))}
                   </motion.div>
                 )}
@@ -280,25 +299,42 @@ export default function App() {
         </nav>
 
         <div className="p-4 border-t border-black/5 dark:border-white/5 space-y-2">
-          <button 
+          <motion.button 
+            whileHover={{ x: isSidebarOpen ? 4 : 0 }}
+            whileTap={{ scale: 0.98 }}
             onClick={toggleTheme}
             className="w-full flex items-center gap-3 p-3 rounded-[6px] transition-all hover:bg-black/5 dark:hover:bg-white/5 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
           >
-            {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            <motion.div
+              initial={false}
+              animate={{ rotate: theme === 'dark' ? 0 : 180 }}
+              transition={{ type: "spring", stiffness: 200, damping: 10 }}
+            >
+              {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </motion.div>
             {isSidebarOpen && <span className="font-bold text-[13px] tracking-tight">{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>}
-          </button>
+          </motion.button>
           
-          <button 
+          <motion.button 
+            whileHover={{ x: isSidebarOpen ? 4 : 0 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => setActiveSection('settings')}
-            className={`w-full flex items-center gap-3 p-3 rounded-[6px] transition-all ${
+            className={`w-full flex items-center gap-3 p-3 rounded-[6px] transition-all relative ${
               activeSection === 'settings' 
                 ? 'nav-item-active' 
                 : 'hover:bg-black/5 dark:hover:bg-white/5 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
             }`}
           >
-            <Settings className="w-5 h-5" />
+            <Settings className={`w-5 h-5 transition-transform group-hover:rotate-45 ${activeSection === 'settings' ? 'rotate-45' : ''}`} />
             {isSidebarOpen && <span className="font-bold text-[13px] tracking-tight">System Settings</span>}
-          </button>
+            {isSidebarOpen && activeSection === 'settings' && (
+              <motion.div 
+                layoutId="active-indicator" 
+                className="w-1 h-4 bg-white rounded-full absolute right-3" 
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              />
+            )}
+          </motion.button>
         </div>
       </motion.aside>
 
@@ -367,14 +403,24 @@ export default function App() {
           </AnimatePresence>
         </div>
 
-        <footer className="glass-panel py-3 px-6 flex justify-between items-center text-[10px] text-[var(--color-text-secondary)] font-bold uppercase tracking-widest">
+        <footer className="glass-panel py-3 px-6 flex justify-between items-center text-[10px] text-[var(--color-text-secondary)] font-bold uppercase tracking-widest bg-black/5 dark:bg-white/2 backdrop-blur-md">
            <div className="flex gap-8">
-             <span>Environment: Linux x86_64</span>
-             <span>Relational: SQLite Vector</span>
+             <span>Env: AI-Studio Container</span>
+             <span>Relational: SQLite Vector Nexus</span>
+             <span className="flex items-center gap-1.5 hover:text-[var(--color-accent)] transition-colors cursor-help">
+               <ShieldAlert size={12} className="text-[var(--color-accent)]" />
+               DLOS: Active
+             </span>
            </div>
-           <span className="flex items-center gap-2 text-[#4ade80] font-black">
-             <div className="w-2 h-2 rounded-full bg-[#4ade80] animate-pulse" /> Architecture Stable
-           </span>
+           <div className="flex items-center gap-6">
+             <div className="flex items-center gap-4 border-r border-white/5 pr-6 mr-6">
+                <span className="opacity-40">System RAM: 16GB</span>
+                <span className="opacity-40">VRAM: 8GB (T4)</span>
+             </div>
+             <span className="flex items-center gap-2 text-[#4ade80] font-black">
+               <div className="w-2 h-2 rounded-full bg-[#4ade80] animate-pulse" /> Cognitive Bridge Synchronized
+             </span>
+           </div>
         </footer>
       </main>
 

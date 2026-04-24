@@ -1,6 +1,6 @@
 {
-  "name": "Proactive AI Student Planner",
-  "description": "An AI-powered academic assistant that proactively organizes your schedule, ingest syllabi via RAG, and correlates wellness data with study productivity.",
-  "requestFramePermissions": [],
+  "name": "Demon Lord AI Orchestrator",
+  "description": "A local-first, hierarchical multi-agent system (DLOS) for autonomous Linux command and control, integrated with a proactive academic planning suite.",
+  "requestFramePermissions": ["microphone"],
   "majorCapabilities": []
 }

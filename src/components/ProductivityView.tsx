@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Target, 
   ListTodo, 
@@ -12,7 +12,15 @@ import {
   Pause, 
   RotateCcw,
   Zap,
-  Star
+  Star,
+  Link,
+  Lock,
+  ArrowRight,
+  AlertCircle,
+  Workflow,
+  Search,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder } from 'motion/react';
 import { 
@@ -32,6 +40,7 @@ interface Task {
   priority: 'High' | 'Medium' | 'Low';
   tag: string;
   status: TaskStatus;
+  dependencyIds?: string[];
 }
 
 export default function ProductivityView() {
@@ -84,17 +93,91 @@ export default function ProductivityView() {
   );
 }
 
+function DependencyLines({ tasks, cardRefs, containerRef }: { tasks: Task[], cardRefs: React.RefObject<{ [key: string]: HTMLElement | null }>, containerRef: React.RefObject<HTMLDivElement> }) {
+  const [lines, setLines] = useState<{ id: string, from: { x: number, y: number }, to: { x: number, y: number }, status: string }[]>([]);
+
+  useEffect(() => {
+    const updateLines = () => {
+      if (!containerRef.current || !cardRefs.current) return;
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const newLines: any[] = [];
+
+      tasks.forEach(task => {
+        if (!task.dependencyIds) return;
+        const toEl = cardRefs.current[task.id];
+        if (!toEl) return;
+        const toRect = toEl.getBoundingClientRect();
+
+        task.dependencyIds.forEach(depId => {
+          const fromEl = cardRefs.current[depId];
+          if (!fromEl) return;
+          const fromRect = fromEl.getBoundingClientRect();
+
+          // Calculate start and end points based on which side is closer
+          // but for simplifying lines we'll go from right of source to left of target
+          newLines.push({
+            id: `${depId}-${task.id}`,
+            from: {
+              x: fromRect.left + fromRect.width - containerRect.left,
+              y: fromRect.top + fromRect.height / 2 - containerRect.top
+            },
+            to: {
+              x: toRect.left - containerRect.left,
+              y: toRect.top + toRect.height / 2 - containerRect.top
+            },
+            status: task.status === 'done' ? 'done' : (tasks.find(t => t.id === depId)?.status === 'done' ? 'complete' : 'pending')
+          });
+        });
+      });
+      setLines(newLines);
+    };
+
+    const interval = setInterval(updateLines, 100); // Poll for layout changes during reordering/animations
+    updateLines();
+    window.addEventListener('resize', updateLines);
+    return () => {
+      window.removeEventListener('resize', updateLines);
+      clearInterval(interval);
+    };
+  }, [tasks, cardRefs, containerRef]);
+
+  return (
+    <svg className="absolute inset-0 pointer-events-none z-0 overflow-visible opacity-50">
+      <defs>
+        <marker id="arrowhead" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto">
+          <polygon points="0 0, 6 2, 0 4" fill="rgba(157, 129, 255, 0.4)" />
+        </marker>
+      </defs>
+      {lines.map(line => (
+        <motion.path
+          key={line.id}
+          d={`M ${line.from.x} ${line.from.y} C ${line.from.x + 30} ${line.from.y}, ${line.to.x - 30} ${line.to.y}, ${line.to.x} ${line.to.y}`}
+          fill="none"
+          stroke={line.status === 'done' ? 'rgba(74, 222, 128, 0.4)' : line.status === 'complete' ? 'rgba(157, 129, 255, 0.6)' : 'rgba(255, 255, 255, 0.1)'}
+          strokeWidth="1.5"
+          strokeDasharray={line.status === 'pending' ? '4 2' : 'none'}
+          markerEnd="url(#arrowhead)"
+          initial={{ pathLength: 0, opacity: 0 }}
+          animate={{ pathLength: 1, opacity: 1 }}
+          transition={{ duration: 0.5 }}
+        />
+      ))}
+    </svg>
+  );
+}
+
 function KanbanBoard() {
   const [tasks, setTasks] = useState<Task[]>(() => {
     const saved = localStorage.getItem("planner_tasks");
     if (saved) return JSON.parse(saved);
-    return [
+    const initialTasks: Task[] = [
       {
         id: "1",
         title: "Biology Lab Report: Cellular Respiration",
         priority: "High",
         tag: "Biology 101",
         status: "progress",
+        dependencyIds: ["2"]
       },
       {
         id: "2",
@@ -102,6 +185,7 @@ function KanbanBoard() {
         priority: "Medium",
         tag: "History of Art",
         status: "todo",
+        dependencyIds: ["3"]
       },
       {
         id: "3",
@@ -118,15 +202,23 @@ function KanbanBoard() {
         status: "done",
       },
     ];
+    return initialTasks;
   });
 
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [showRelations, setShowRelations] = useState(true);
+  const [depSearch, setDepSearch] = useState("");
+  
+  const boardContainerRef = useRef<HTMLDivElement>(null);
+  const cardRefs = useRef<{ [key: string]: HTMLElement | null }>({});
+
   const [taskForm, setTaskForm] = useState<Partial<Task>>({
     title: "",
     priority: "Medium",
     tag: "General",
     status: "todo",
+    dependencyIds: [],
   });
 
   useEffect(() => {
@@ -142,10 +234,10 @@ function KanbanBoard() {
   const openTaskModal = (task: Task | null = null, initialStatus: TaskStatus = "todo") => {
     if (task) {
       setEditingTask(task);
-      setTaskForm(task);
+      setTaskForm({ ...task, dependencyIds: task.dependencyIds || [] });
     } else {
       setEditingTask(null);
-      setTaskForm({ title: "", priority: "Medium", tag: "General", status: initialStatus });
+      setTaskForm({ title: "", priority: "Medium", tag: "General", status: initialStatus, dependencyIds: [] });
     }
     setShowTaskModal(true);
   };
@@ -163,6 +255,7 @@ function KanbanBoard() {
         priority: taskForm.priority || "Medium",
         tag: taskForm.tag || "General",
         status: taskForm.status || "todo",
+        dependencyIds: taskForm.dependencyIds || [],
       };
       setTasks((prev) => [...prev, newTask]);
     }
@@ -188,115 +281,211 @@ function KanbanBoard() {
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
-      {columns.map((col) => (
-        <div key={col.id} className="space-y-4">
-          <div className="flex items-center justify-between px-2">
-            <div className="flex items-center gap-2">
-              <div
-                className="w-2 h-2 rounded-full"
-                style={{
-                  backgroundColor:
-                    col.color === "#white/20"
-                      ? "rgba(255,255,255,0.2)"
-                      : col.color,
-                }}
-              />
-              <h3 className="text-xs font-black uppercase tracking-widest text-white/50">
-                {col.label}
-              </h3>
-              <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-white/30 font-mono">
-                {tasks.filter((t) => t.status === col.id).length}
-              </span>
-            </div>
-            <button 
-              onClick={() => openTaskModal(null, col.id)}
-              className="text-white/20 hover:text-white transition-colors"
-            >
-              <Plus size={16} />
-            </button>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between px-2">
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2">
+            <ListTodo size={16} className="text-white/40" />
+            <h3 className="text-xs font-black uppercase tracking-widest text-white/40">Active Board</h3>
           </div>
+          
+          <button 
+            onClick={() => setShowRelations(!showRelations)}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${
+              showRelations ? 'bg-[#9d81ff]/20 text-[#9d81ff] border border-[#9d81ff]/30' : 'bg-white/5 text-white/40 border border-white/5'
+            }`}
+          >
+            {showRelations ? <Eye size={12} /> : <EyeOff size={12} />}
+            {showRelations ? 'Relations Visible' : 'Relations Hidden'}
+          </button>
+        </div>
 
-          <div className="space-y-3 min-h-[400px] p-2 bg-white/[0.02] rounded-3xl border border-dashed border-white/5">
-            <Reorder.Group 
-              axis="y" 
-              values={tasks.filter((t) => t.status === col.id)} 
-              onReorder={(newOrder) => handleReorder(col.id, newOrder)}
-              className="space-y-3"
-            >
-              {tasks
-                .filter((t) => t.status === col.id)
-                .map((task) => (
-                  <Reorder.Item
-                    value={task}
-                    key={task.id}
-                    className="p-5 glass-card space-y-4 group cursor-grab active:cursor-grabbing hover:border-white/20 transition-all shadow-sm"
-                  >
-                    <div className="flex items-start justify-between">
-                      <span
-                        className={`text-[9px] font-black uppercase tracking-tighter px-2 py-0.5 rounded border ${
-                          task.priority === "High"
-                            ? "bg-red-500/10 text-red-400 border-red-500/20"
-                            : task.priority === "Medium"
-                              ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                              : "bg-white/10 text-white/40 border-white/20"
+        <div className="flex items-center gap-4">
+           <div className="flex items-center gap-1 text-[9px] font-bold text-white/20 px-3 py-1.5 bg-white/5 rounded-lg border border-white/5">
+              <Workflow size={10} />
+              <span>{tasks.reduce((acc, t) => acc + (t.dependencyIds?.length || 0), 0)} Total Links</span>
+           </div>
+        </div>
+      </div>
+
+      <div ref={boardContainerRef} className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
+        {showRelations && (
+          <DependencyLines tasks={tasks} cardRefs={cardRefs} containerRef={boardContainerRef} />
+        )}
+        {columns.map((col) => (
+          <div key={col.id} className="space-y-4">
+            <div className="flex items-center justify-between px-2">
+              <div className="flex items-center gap-2">
+                <div
+                  className="w-2 h-2 rounded-full"
+                  style={{
+                    backgroundColor:
+                      col.color === "#white/20"
+                        ? "rgba(255,255,255,0.2)"
+                        : col.color,
+                  }}
+                />
+                <h3 className="text-xs font-black uppercase tracking-widest text-white/50">
+                  {col.label}
+                </h3>
+                <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-white/30 font-mono">
+                  {tasks.filter((t) => t.status === col.id).length}
+                </span>
+              </div>
+              <button 
+                onClick={() => openTaskModal(null, col.id)}
+                className="text-white/20 hover:text-white transition-colors"
+              >
+                <Plus size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-3 min-h-[400px] p-2 bg-white/[0.02] rounded-3xl border border-dashed border-white/5">
+              <Reorder.Group 
+                axis="y" 
+                values={tasks.filter((t) => t.status === col.id)} 
+                onReorder={(newOrder) => handleReorder(col.id, newOrder)}
+                className="space-y-3"
+              >
+                {tasks
+                  .filter((t) => t.status === col.id)
+                  .map((task) => {
+                    const dependencies = tasks.filter(t => task.dependencyIds?.includes(t.id));
+                    const isBlocked = dependencies.some(d => d.status !== 'done');
+                    const isReady = task.dependencyIds && task.dependencyIds.length > 0 && !isBlocked;
+                    const dependantsCount = tasks.filter(t => t.dependencyIds?.includes(task.id)).length;
+                    const completedDeps = dependencies.filter(d => d.status === 'done').length;
+
+                    return (
+                      <Reorder.Item
+                        value={task}
+                        key={task.id}
+                        ref={el => cardRefs.current[task.id] = (el as any)}
+                        className={`p-5 glass-card space-y-4 group cursor-grab active:cursor-grabbing hover:border-white/20 transition-all shadow-sm relative z-10 ${
+                          isBlocked ? 'opacity-80 bg-[#12121a]' : isReady ? 'bg-[#1a1a24]/90 ring-1 ring-[#4ade80]/20' : 'bg-[#1a1a24]/80 backdrop-blur-sm'
                         }`}
                       >
-                        {task.priority}
-                      </span>
-                      <button 
-                        onClick={() => openTaskModal(task)}
-                        className="text-white/20 hover:text-white group-hover:block hidden"
-                      >
-                        <MoreHorizontal size={14} />
-                      </button>
-                    </div>
-
-                    <p className="text-sm font-bold text-white leading-tight">
-                      {task.title}
-                    </p>
-
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 text-[10px] font-medium text-white/30">
-                        <Star size={10} className="text-[#9d81ff]" />
-                        {task.tag}
-                      </div>
-
-                      <div className="flex gap-1">
-                        {col.id !== "todo" && (
-                          <button
-                            onClick={() =>
-                              moveTask(
-                                task.id,
-                                col.id === "done" ? "progress" : "todo",
-                              )
-                            }
-                            className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-white/30 hover:text-white transition-all"
-                          >
-                            <RotateCcw size={12} />
-                          </button>
+                        {isReady && (
+                          <div className="absolute -top-1 -right-1 flex gap-1">
+                            <motion.div 
+                              animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
+                              transition={{ duration: 2, repeat: Infinity }}
+                              className="w-2 h-2 bg-green-500 rounded-full blur-[2px]"
+                            />
+                          </div>
                         )}
-                        {col.id !== "done" && (
-                          <button
-                            onClick={() =>
-                              moveTask(
-                                task.id,
-                                col.id === "todo" ? "progress" : "done",
-                              )
-                            }
-                            className="p-1.5 bg-[#9d81ff]/20 hover:bg-[#9d81ff] rounded-lg text-[#9d81ff] hover:text-white transition-all"
+                        <div className="flex items-start justify-between">
+                          <div className="flex flex-wrap gap-2">
+                            <span
+                              className={`text-[9px] font-black uppercase tracking-tighter px-2 py-0.5 rounded border ${
+                                task.priority === "High"
+                                  ? "bg-red-500/10 text-red-400 border-red-500/20"
+                                  : task.priority === "Medium"
+                                    ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                                    : "bg-white/10 text-white/40 border-white/20"
+                              }`}
+                            >
+                              {task.priority}
+                            </span>
+                            {isBlocked && (
+                              <div className="flex items-center gap-1 bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter">
+                                <Lock size={10} />
+                                {completedDeps}/{dependencies.length} Prerequisites
+                              </div>
+                            )}
+                            {isReady && task.status !== 'done' && (
+                              <div className="flex items-center gap-1 bg-green-500/10 text-green-400 border border-green-500/20 px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter animate-pulse">
+                                <Zap size={10} fill="currentColor" />
+                                Unlocked
+                              </div>
+                            )}
+                            {dependantsCount > 0 && (
+                              <div className="flex items-center gap-1 bg-[#9d81ff]/10 text-[#9d81ff] border border-[#9d81ff]/20 px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter">
+                                <Workflow size={10} />
+                                {dependantsCount} Downstream
+                              </div>
+                            )}
+                          </div>
+                          <button 
+                            onClick={() => openTaskModal(task)}
+                            className="text-white/20 hover:text-white group-hover:block hidden"
                           >
-                            <CheckCircle2 size={12} />
+                            <MoreHorizontal size={14} />
                           </button>
+                        </div>
+
+                        <p className="text-sm font-bold text-white leading-tight">
+                          {task.title}
+                        </p>
+
+                        {dependencies.length > 0 && (
+                          <div className="space-y-1.5 py-1">
+                            <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-white/20">
+                              <Link size={10} />
+                              Prerequisites
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {dependencies.map(dep => (
+                                <div 
+                                  key={dep.id}
+                                  className={`px-2 py-1 rounded bg-white/5 border border-white/5 text-[9px] font-medium flex items-center gap-1 ${
+                                    dep.status === 'done' ? 'text-green-400' : 'text-white/40'
+                                  }`}
+                                >
+                                  {dep.status === 'done' ? <CheckCircle2 size={10} /> : <Circle size={10} />}
+                                  <span className="truncate max-w-[80px]">{dep.title}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
                         )}
-                      </div>
-                    </div>
-                  </Reorder.Item>
-                ))}
-            </Reorder.Group>
+
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 text-[10px] font-medium text-white/30">
+                            <Star size={10} className="text-[#9d81ff]" />
+                            {task.tag}
+                          </div>
+
+                          <div className="flex gap-1">
+                            {col.id !== "todo" && (
+                              <button
+                                onClick={() =>
+                                  moveTask(
+                                    task.id,
+                                    col.id === "done" ? "progress" : "todo",
+                                  )
+                                }
+                                className="p-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-white/30 hover:text-white transition-all"
+                              >
+                                <RotateCcw size={12} />
+                              </button>
+                            )}
+                            {col.id !== "done" && (
+                              <button
+                                disabled={isBlocked}
+                                onClick={() =>
+                                  moveTask(
+                                    task.id,
+                                    col.id === "todo" ? "progress" : "done",
+                                  )
+                                }
+                                className={`p-1.5 bg-[#9d81ff]/20 hover:bg-[#9d81ff] rounded-lg text-[#9d81ff] hover:text-white transition-all ${
+                                  isBlocked ? 'opacity-20 cursor-not-allowed' : ''
+                                }`}
+                              >
+                                <CheckCircle2 size={12} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </Reorder.Item>
+                    );
+                  })}
+              </Reorder.Group>
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
 
       <AnimatePresence>
         {showTaskModal && (
@@ -390,6 +579,88 @@ function KanbanBoard() {
                       <option value="done" className="bg-[#1a1a24]">Completed</option>
                     </select>
                   </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-black uppercase text-white/30 tracking-widest block">
+                      Prerequisites (Linked Nodes)
+                    </label>
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-black/20 rounded-xl border border-white/5">
+                      <Search size={12} className="text-white/20" />
+                      <input 
+                        type="text" 
+                        placeholder="Search objectives..." 
+                        value={depSearch}
+                        onChange={(e) => setDepSearch(e.target.value)}
+                        className="bg-transparent border-none outline-none text-[10px] text-white w-32 placeholder:text-white/10"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 max-h-[160px] overflow-y-auto pr-2 custom-scrollbar">
+                    {useMemo(() => tasks
+                      .filter(t => !editingTask || t.id !== editingTask.id)
+                      .filter(t => t.title.toLowerCase().includes(depSearch.toLowerCase()))
+                      .map(t => {
+                        const isSelected = taskForm.dependencyIds?.includes(t.id);
+                        return (
+                          <button
+                            key={t.id}
+                            onClick={() => {
+                              const current = taskForm.dependencyIds || [];
+                              const next = isSelected 
+                                ? current.filter(id => id !== t.id)
+                                : [...current, t.id];
+                              setTaskForm({ ...taskForm, dependencyIds: next });
+                            }}
+                            className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all text-left ${
+                              isSelected 
+                                ? 'bg-[#9d81ff]/10 border-[#9d81ff]/40 text-white' 
+                                : 'bg-white/5 border-white/5 text-white/40 hover:bg-white/10'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`p-1.5 rounded ${isSelected ? 'bg-[#9d81ff] text-white' : 'bg-white/10 text-white/20'}`}>
+                                <Link size={12} />
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold truncate max-w-[200px]">{t.title}</p>
+                                <p className="text-[9px] uppercase tracking-tighter opacity-50">{t.status}</p>
+                              </div>
+                            </div>
+                            {isSelected ? <CheckCircle2 size={16} className="text-[#9d81ff]" /> : <Circle size={16} className="opacity-20" />}
+                          </button>
+                        );
+                      }), [tasks, editingTask, depSearch, taskForm.dependencyIds])
+                    }
+                    {tasks.length <= 1 && (
+                      <p className="text-[10px] text-white/20 italic text-center py-4">No other nodes available to link.</p>
+                    )}
+                  </div>
+
+                  {editingTask && (
+                    <div className="pt-4 space-y-3 border-t border-white/5">
+                       <label className="text-[10px] font-black uppercase text-white/20 tracking-widest block flex items-center gap-2">
+                        <Workflow size={10} />
+                        Impacted Nodes (Dependent on this)
+                      </label>
+                      <div className="grid grid-cols-1 gap-2">
+                        {tasks.filter(t => t.dependencyIds?.includes(editingTask.id)).map(t => (
+                           <div key={t.id} className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/5">
+                              <ArrowRight size={10} className="text-[#9d81ff]/40" />
+                              <div className="flex-1">
+                                <p className="text-xs font-bold text-white/60 truncate">{t.title}</p>
+                                <p className="text-[8px] uppercase font-black text-white/20 opacity-50">{t.status}</p>
+                              </div>
+                           </div>
+                        ))}
+                        {tasks.filter(t => t.dependencyIds?.includes(editingTask.id)).length === 0 && (
+                          <p className="text-[9px] text-white/10 italic px-2">No nodes currently nested under this objective.</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="p-8 border-t border-white/5 bg-black/20 flex gap-3">
